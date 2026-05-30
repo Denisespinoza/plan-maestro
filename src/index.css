@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, Oxygen, Ubuntu, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #B8A4FF;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9F7AEA;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: #475569;
+  }
+}
+
+@layer utilities {
+  .border-3 {
+    border-width: 3px;
+  }
+
+  /* Custom shadows for Modeltex cards */
+  .shadow-modeltex {
+    box-shadow: 0 4px 12px rgba(15, 76, 92, 0.1), 0 2px 4px rgba(184, 164, 255, 0.05);
+  }
+
+  .shadow-modeltex-lg {
+    box-shadow: 0 8px 24px rgba(15, 76, 92, 0.12), 0 4px 8px rgba(184, 164, 255, 0.08);
+  }
+}
