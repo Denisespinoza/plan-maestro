@@ -9,6 +9,8 @@ export type ModelStatus = 'active' | 'hidden' | 'archived';
 export type CatalogStatus = 'active' | 'hidden' | 'archived' | 'no_publish' | 'client_specific';
 export type FileType = 'pdf_a4' | 'pdf_plotter' | 'plt' | 'dxf' | 'cdr' | 'ai' | 'zip' | 'jpg' | 'png' | 'other';
 export type CatalogTag = 'muestra_fisica' | 'molde_aprobado' | 'para_redes' | 'no_publicar' | 'cliente_privado' | 'inspiracion' | 'produccion' | 'digital' | 'carton';
+export type EmployeeStatus = 'active' | 'inactive';
+export type PaymentType = 'adelanto' | 'pago_parcial' | 'pago_final';
 
 export interface Client {
   id: string;
@@ -120,6 +122,37 @@ export interface CatalogItem {
   updated_at: string;
 }
 
+// Personal module types
+export interface Employee {
+  id: string;
+  name: string;
+  phone: string;
+  position: string;
+  start_date: string;
+  monthly_salary: number;
+  status: EmployeeStatus;
+  created_at: string;
+}
+
+export interface EmployeeAttendance {
+  id: string;
+  employee_id: string;
+  date: string;
+  entry_time: string | null;
+  exit_time: string | null;
+  created_at: string;
+}
+
+export interface EmployeePayment {
+  id: string;
+  employee_id: string;
+  date: string;
+  amount: number;
+  payment_type: PaymentType;
+  notes: string;
+  created_at: string;
+}
+
 export const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bgClass: string; textClass: string; dotClass: string }> = {
   nuevo: { label: 'Nuevo', color: '#B8A4FF', bgClass: 'bg-violet-100 dark:bg-violet-900/30', textClass: 'text-violet-700 dark:text-violet-300', dotClass: 'bg-violet-500' },
   en_proceso: { label: 'En proceso', color: '#0F4C5C', bgClass: 'bg-petrol-100 dark:bg-petrol-900/30', textClass: 'text-petrol-700 dark:text-petrol-300', dotClass: 'bg-petrol-500' },
@@ -222,3 +255,18 @@ export const CATALOG_TAG_OPTIONS = [
   'muestra_fisica', 'molde_aprobado', 'para_redes', 'no_publicar',
   'cliente_privado', 'inspiracion', 'produccion', 'digital', 'carton'
 ];
+
+// Personal configs
+export const EMPLOYEE_STATUS_CONFIG: Record<EmployeeStatus, { label: string; bgClass: string; textClass: string }> = {
+  active: { label: 'Activo', bgClass: 'bg-emerald-100 dark:bg-emerald-900/30', textClass: 'text-emerald-700 dark:text-emerald-300' },
+  inactive: { label: 'Inactivo', bgClass: 'bg-gray-100 dark:bg-gray-700/50', textClass: 'text-gray-600 dark:text-gray-400' },
+};
+
+export const PAYMENT_TYPE_CONFIG: Record<PaymentType, { label: string; color: string }> = {
+  adelanto: { label: 'Adelanto', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+  pago_parcial: { label: 'Pago parcial', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+  pago_final: { label: 'Pago final', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
+};
+
+export const EMPLOYEE_STATUS_OPTIONS: EmployeeStatus[] = ['active', 'inactive'];
+export const PAYMENT_TYPE_OPTIONS: PaymentType[] = ['adelanto', 'pago_parcial', 'pago_final'];

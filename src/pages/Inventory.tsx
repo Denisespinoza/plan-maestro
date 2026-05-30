@@ -130,7 +130,14 @@ export default function Inventory({ onNavigate }: InventoryProps) {
       let photoUrl = editingModel?.main_photo_url || '';
 
       if (photoFile) {
-        photoUrl = await uploadModelPhoto(photoFile, editingModel?.id || `temp-${Date.now()}`);
+        try {
+          photoUrl = await uploadModelPhoto(photoFile, editingModel?.id || `temp-${Date.now()}`);
+        } catch (uploadErr) {
+          console.error('Error uploading photo:', uploadErr);
+          alert('Error al subir la foto. Intentá de nuevo.');
+          setSaving(false);
+          return;
+        }
       }
 
       if (editingModel) {
@@ -138,8 +145,11 @@ export default function Inventory({ onNavigate }: InventoryProps) {
       } else {
         await createModel({ ...form, main_photo_url: photoUrl });
       }
+
+      // Close modal first, then reload data
       setShowModal(false);
-      loadData();
+      setPhotoFile(null);
+      await loadData();
     } catch (err) {
       console.error(err);
       alert('Error al guardar el modelo');

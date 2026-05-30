@@ -11,8 +11,9 @@ import Clients from './pages/Clients';
 import Inventory from './pages/Inventory';
 import MoldLibrary from './pages/MoldLibrary';
 import InternalCatalog from './pages/InternalCatalog';
+import Personal from './pages/Personal';
 
-type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog';
+type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog' | 'personal';
 
 function AppContent() {
   const { loading } = useAuth();
@@ -65,6 +66,8 @@ function AppContent() {
         return <MoldLibrary modelId={selectedModelId || undefined} onNavigate={handleNavigate} />;
       case 'catalog':
         return <InternalCatalog onNavigate={handleNavigate} />;
+      case 'personal':
+        return <Personal />;
       default:
         return <Dashboard onNavigate={handleNavigate} />;
     }

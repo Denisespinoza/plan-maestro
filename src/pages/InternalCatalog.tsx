@@ -141,7 +141,14 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
       let photoUrl = editingItem?.photo_url || '';
 
       if (photoFile) {
-        photoUrl = await uploadCatalogImage(photoFile, editingItem?.id || `temp-${Date.now()}`);
+        try {
+          photoUrl = await uploadCatalogImage(photoFile, editingItem?.id || `temp-${Date.now()}`);
+        } catch (uploadErr) {
+          console.error('Error uploading photo:', uploadErr);
+          alert('Error al subir la foto. Intentá de nuevo.');
+          setSaving(false);
+          return;
+        }
       }
 
       if (editingItem) {
@@ -157,8 +164,11 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
           photo_url: photoUrl,
         });
       }
+
+      // Close modal first, then reload data
       setShowModal(false);
-      loadData();
+      setPhotoFile(null);
+      await loadData();
     } catch (err) {
       console.error(err);
       alert('Error al guardar');
