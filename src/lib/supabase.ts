@@ -1,6 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import { config } from './config';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Only create Supabase client if properly configured
+let supabaseInstance: ReturnType<typeof createClient> | null = null;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (config.isConfigured && config.supabaseUrl && config.supabaseAnonKey) {
+  supabaseInstance = createClient(config.supabaseUrl, config.supabaseAnonKey);
+}
+
+// Export as non-null for existing code, but check config in component tree
+export const supabase = supabaseInstance!;
