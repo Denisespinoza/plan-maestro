@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTheme } from '../lib/theme';
+import { useAuth } from '../lib/AuthContext';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -47,9 +48,14 @@ const NAV_ITEMS: NavItem[] = [
   { page: 'finance', label: 'Finanzas', icon: DollarSign, adminOnly: true },
 ];
 
-export default function Layout({ currentPage, onNavigate, children, isAdmin = false, onLogout }: LayoutProps) {
+export default function Layout({ currentPage, onNavigate, children, isAdmin: isAdminProp = false, onLogout }: LayoutProps) {
   const { theme, toggleTheme } = useTheme();
+  const { isAdmin: authIsAdmin, profile } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isAdmin = authIsAdmin || isAdminProp;
+
+  console.log('isAdmin', isAdmin);
+  console.log('profile', profile);
 
   const handleNav = (page: Page) => {
     onNavigate(page);
