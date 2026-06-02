@@ -43,8 +43,8 @@ const NAV_ITEMS: NavItem[] = [
   { page: 'inventory', label: 'Inventario', icon: Package },
   { page: 'library', label: 'Biblioteca', icon: FolderOpen },
   { page: 'catalog', label: 'Catálogo Interno', icon: ImageIcon },
-  { page: 'personal', label: 'Personal', icon: UserCog, adminOnly: true },
-  { page: 'finance', label: 'Finanzas', icon: DollarSign, adminOnly: true },
+  { page: 'personal', label: 'Personal', icon: UserCog },
+  { page: 'finance', label: 'Finanzas', icon: DollarSign },
 ];
 
 export default function Layout({ currentPage, onNavigate, children, isAdmin = false, onLogout }: LayoutProps) {
@@ -56,8 +56,7 @@ export default function Layout({ currentPage, onNavigate, children, isAdmin = fa
     setSidebarOpen(false);
   };
 
-  // Filter nav items based on role
-  const visibleNavItems = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
+  const visibleNavItems = NAV_ITEMS;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 transition-colors duration-200">
