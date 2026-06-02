@@ -1,6 +1,32 @@
 import { supabase } from './supabase';
 import type { Employee, EmployeeAttendance, EmployeePayment } from './types';
 
+type EmployeePayload = Pick<Employee, 'name' | 'phone' | 'position' | 'start_date' | 'monthly_salary' | 'status'>;
+
+function toEmployeePayload(employee: Partial<Employee>): EmployeePayload {
+  return {
+    name: employee.name?.trim() || '',
+    phone: employee.phone?.trim() || '',
+    position: employee.position?.trim() || '',
+    start_date: employee.start_date || new Date().toISOString().split('T')[0],
+    monthly_salary: Number(employee.monthly_salary) || 0,
+    status: employee.status || 'active',
+  };
+}
+
+function toEmployeeUpdatePayload(employee: Partial<Employee>): Partial<EmployeePayload> {
+  const payload: Partial<EmployeePayload> = {};
+
+  if (employee.name !== undefined) payload.name = employee.name.trim();
+  if (employee.phone !== undefined) payload.phone = employee.phone.trim();
+  if (employee.position !== undefined) payload.position = employee.position.trim();
+  if (employee.start_date !== undefined) payload.start_date = employee.start_date;
+  if (employee.monthly_salary !== undefined) payload.monthly_salary = Number(employee.monthly_salary) || 0;
+  if (employee.status !== undefined) payload.status = employee.status;
+
+  return payload;
+}
+
 // Employees
 export async function getEmployees(): Promise<Employee[]> {
   const { data, error } = await supabase
@@ -30,17 +56,10 @@ export async function getActiveEmployees(): Promise<Employee[]> {
 }
 
 export async function createEmployee(employee: Partial<Employee>): Promise<Employee> {
-  console.log('[createEmployee] Inserting employee:', employee);
+  const payload = toEmployeePayload(employee);
   const { data, error } = await supabase
     .from('employees')
-    .insert({
-      name: employee.name || '',
-      phone: employee.phone || '',
-      position: employee.position || '',
-      start_date: employee.start_date || new Date().toISOString().split('T')[0],
-      monthly_salary: employee.monthly_salary || 0,
-      status: employee.status || 'active',
-    })
+    .insert(payload)
     .select()
     .maybeSingle();
 
@@ -48,14 +67,14 @@ export async function createEmployee(employee: Partial<Employee>): Promise<Emplo
     console.error('[createEmployee] Supabase error:', error);
     throw new Error(`Error al crear empleado: ${error.message} (código: ${error.code})`);
   }
-  console.log('[createEmployee] Success:', data);
   return data!;
 }
 
 export async function updateEmployee(id: string, updates: Partial<Employee>): Promise<Employee> {
+  const payload = toEmployeeUpdatePayload(updates);
   const { data, error } = await supabase
     .from('employees')
-    .update(updates)
+    .update(payload)
     .eq('id', id)
     .select()
     .maybeSingle();
