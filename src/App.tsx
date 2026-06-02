@@ -36,11 +36,6 @@ function AppContent() {
   }
 
   const handleNavigate = (page: string, orderId?: string, _clientId?: string, modelId?: string) => {
-    // Restrict access to admin-only pages
-    if ((page === 'personal' || page === 'finance') && !isAdmin) {
-      return;
-    }
-
     setCurrentPage(page as Page);
     if (orderId) setSelectedOrderId(orderId);
     if (modelId) setSelectedModelId(modelId);
@@ -70,7 +65,7 @@ function AppContent() {
       case 'clients':
         return <Clients onNavigate={handleNavigate} />;
       case 'finance':
-        return isAdmin ? <Finance /> : <Dashboard onNavigate={handleNavigate} />;
+        return <Finance />;
       case 'inventory':
         return <Inventory onNavigate={handleNavigate} />;
       case 'library':
@@ -78,7 +73,7 @@ function AppContent() {
       case 'catalog':
         return <InternalCatalog onNavigate={handleNavigate} />;
       case 'personal':
-        return isAdmin ? <Personal /> : <Dashboard onNavigate={handleNavigate} />;
+        return <Personal />;
       default:
         return <Dashboard onNavigate={handleNavigate} />;
     }
