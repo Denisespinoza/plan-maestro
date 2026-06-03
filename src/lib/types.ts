@@ -153,6 +153,28 @@ export interface EmployeePayment {
   created_at: string;
 }
 
+
+export type FinanceMovementType = 'income' | 'expense';
+export type FinanceMovementStatus = 'collected' | 'paid' | 'pending';
+
+export interface FinanceMovement {
+  id: string;
+  type: FinanceMovementType;
+  amount: number;
+  category: string;
+  payment_method: string;
+  description: string;
+  status: FinanceMovementStatus;
+  movement_date: string;
+  customer_id: string | null;
+  order_id: string | null;
+  employee_id: string | null;
+  related_person: string | null;
+  attachment_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bgClass: string; textClass: string; dotClass: string }> = {
   nuevo: { label: 'Nuevo', color: '#B8A4FF', bgClass: 'bg-violet-100 dark:bg-violet-900/30', textClass: 'text-violet-700 dark:text-violet-300', dotClass: 'bg-violet-500' },
   en_proceso: { label: 'En proceso', color: '#0F4C5C', bgClass: 'bg-petrol-100 dark:bg-petrol-900/30', textClass: 'text-petrol-700 dark:text-petrol-300', dotClass: 'bg-petrol-500' },
