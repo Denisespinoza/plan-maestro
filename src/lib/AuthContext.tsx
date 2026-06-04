@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { getPermissionsForRole, resolveRole, type AppPermissions, type AppRole } from './permissions';
@@ -10,27 +10,37 @@ interface UserProfile {
   role: string;
 }
 
+type AuthStatus = 'loading' | 'anonymous' | 'admin' | 'empleado' | 'pendiente' | 'error';
+
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   isAdmin: boolean;
-  role: AppRole;
+  role: AppRole | null;
+  authStatus: AuthStatus;
+  authError: string | null;
   permissions: AppPermissions;
   loading: boolean;
   signOut: () => Promise<void>;
 }
 
+const pendingPermissions = getPermissionsForRole('pendiente');
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   isAdmin: false,
-  role: 'pendiente',
-  permissions: getPermissionsForRole('pendiente'),
+  role: null,
+  authStatus: 'loading',
+  authError: null,
+  permissions: pendingPermissions,
   loading: true,
   signOut: async () => {},
 });
 
-async function getUserProfile(userId: string): Promise<UserProfile | null> {
+async function getUserProfile(userId: string, userEmail?: string): Promise<UserProfile> {
+  console.info('[getUserProfile] Buscando perfil con user_profiles.id = auth user.id:', userId);
+
   const { data, error } = await supabase
     .from('user_profiles')
     .select('id, email, full_name, role')
@@ -38,51 +48,128 @@ async function getUserProfile(userId: string): Promise<UserProfile | null> {
     .maybeSingle();
 
   if (error) {
-    console.error('[getUserProfile] Supabase error:', error);
-    return null;
+    console.error('[getUserProfile] Supabase error leyendo public.user_profiles por id:', error);
+    throw new Error(`No se pudo leer el perfil de usuario: ${error.message}`);
   }
 
-  return data as UserProfile | null;
+  const profile = data as UserProfile | null;
+
+  if (!profile) {
+    console.error('[getUserProfile] No existe perfil en user_profiles para auth user.id:', {
+      authUserId: userId,
+      authEmail: userEmail,
+    });
+    throw new Error(`No existe un perfil en public.user_profiles para el auth user.id ${userId}. Verificá que user_profiles.id coincida con el ID del usuario autenticado, no solo con el email${userEmail ? ` (${userEmail})` : ''}.`);
+  }
+
+  if (profile.id !== userId) {
+    console.error('[getUserProfile] Mismatch entre auth user.id y user_profiles.id:', {
+      authUserId: userId,
+      profileId: profile.id,
+      email: profile.email,
+    });
+    throw new Error('El perfil encontrado no coincide con el usuario autenticado.');
+  }
+
+  console.info('[getUserProfile] Perfil cargado correctamente:', {
+    authUserId: userId,
+    profileId: profile.id,
+    email: profile.email,
+    role: profile.role,
+  });
+
+  return profile;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [role, setRole] = useState<AppRole | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
+  const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const applySessionUser = async (sessionUser: User | null) => {
+      setLoading(true);
+      setAuthStatus('loading');
+      setAuthError(null);
       setUser(sessionUser);
-      setProfile(sessionUser ? await getUserProfile(sessionUser.id) : null);
-      setLoading(false);
+      setProfile(null);
+      setRole(null);
+
+      if (!sessionUser) {
+        if (cancelled) return;
+        setAuthStatus('anonymous');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const loadedProfile = await getUserProfile(sessionUser.id, sessionUser.email);
+        if (cancelled) return;
+
+        setProfile(loadedProfile);
+
+        const resolvedRole = resolveRole(loadedProfile.role);
+        setRole(resolvedRole);
+        setAuthStatus(resolvedRole);
+      } catch (err) {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : 'Error desconocido al verificar el rol del usuario.';
+        console.error('[AuthProvider] Error verificando usuario/rol:', err);
+        setAuthError(message);
+        setAuthStatus('error');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
 
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('[AuthProvider] Error obteniendo sesión de Supabase Auth:', error);
+        setAuthError(`No se pudo obtener la sesión: ${error.message}`);
+        setAuthStatus('error');
+        setLoading(false);
+        return;
+      }
+
       applySessionUser(session?.user ?? null);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      applySessionUser(session?.user ?? null);
+      // Evita correr consultas async directamente dentro del callback de auth.
+      setTimeout(() => applySessionUser(session?.user ?? null), 0);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
+    setRole(null);
+    setAuthStatus('anonymous');
+    setAuthError(null);
   };
+
+  const permissions = useMemo(() => getPermissionsForRole(role), [role]);
 
   return (
     <AuthContext.Provider value={{
       user,
       profile,
-      isAdmin: resolveRole(profile?.role || user?.app_metadata?.role || user?.user_metadata?.role) === 'admin',
-      role: resolveRole(profile?.role || user?.app_metadata?.role || user?.user_metadata?.role),
-      permissions: getPermissionsForRole(profile?.role || user?.app_metadata?.role || user?.user_metadata?.role),
+      isAdmin: role === 'admin',
+      role,
+      authStatus,
+      authError,
+      permissions,
       loading,
       signOut,
     }}>

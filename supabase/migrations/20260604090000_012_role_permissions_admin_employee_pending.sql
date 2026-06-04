@@ -7,12 +7,6 @@
   - pendiente: can only read own profile; no internal data access.
 */
 
-ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_role_check;
-ALTER TABLE user_profiles
-  ADD CONSTRAINT user_profiles_role_check CHECK (role IN ('admin', 'empleado', 'staff', 'pendiente'));
-
-ALTER TABLE user_profiles ALTER COLUMN role SET DEFAULT 'pendiente';
-
 CREATE OR REPLACE FUNCTION public.current_app_role()
 RETURNS text AS $$
   SELECT COALESCE((SELECT role FROM public.user_profiles WHERE id = auth.uid()), 'pendiente');
@@ -50,11 +44,17 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Users may read their own profile; only admins manage roles/profiles.
+-- Important: drop the old recursive admin SELECT policy that queried user_profiles inside
+-- a user_profiles policy and could make getUserProfile fail, causing false "pendiente" UI.
+DROP POLICY IF EXISTS "Users read own profile" ON user_profiles;
 DROP POLICY IF EXISTS "Users update own profile" ON user_profiles;
+DROP POLICY IF EXISTS "Admins read all profiles" ON user_profiles;
 DROP POLICY IF EXISTS "Admins insert profiles" ON user_profiles;
 DROP POLICY IF EXISTS "Admins update all profiles" ON user_profiles;
 DROP POLICY IF EXISTS "Admins delete profiles" ON user_profiles;
 
+CREATE POLICY "Users read own profile" ON user_profiles FOR SELECT TO authenticated USING (auth.uid() = id);
+CREATE POLICY "Admins read all profiles" ON user_profiles FOR SELECT TO authenticated USING (public.is_admin());
 CREATE POLICY "Admins insert profiles" ON user_profiles FOR INSERT TO authenticated WITH CHECK (public.is_admin());
 CREATE POLICY "Admins update all profiles" ON user_profiles FOR UPDATE TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 CREATE POLICY "Admins delete profiles" ON user_profiles FOR DELETE TO authenticated USING (public.is_admin());
