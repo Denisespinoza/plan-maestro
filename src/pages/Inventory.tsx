@@ -16,12 +16,14 @@ import {
   MODEL_STATUS_OPTIONS,
 } from '../lib/types';
 import { Search, Plus, CreditCard as Edit3, Eye, Trash2, FileText, Filter, TrendingUp, Package, X, Save, Loader2, Upload, FileSpreadsheet } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 interface InventoryProps {
   onNavigate: (page: string, orderId?: string, clientId?: string, modelId?: string) => void;
 }
 
 export default function Inventory({ onNavigate }: InventoryProps) {
+  const { permissions } = useAuth();
   const [models, setModels] = useState<InventoryModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -34,6 +36,7 @@ export default function Inventory({ onNavigate }: InventoryProps) {
   const [editingModel, setEditingModel] = useState<InventoryModel | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [form, setForm] = useState({
     code: '',
@@ -86,6 +89,7 @@ export default function Inventory({ onNavigate }: InventoryProps) {
   }, [models, search, filterCategory, filterStatus]);
 
   const openNewModel = () => {
+    if (!permissions.canCreateInventory) return;
     setEditingModel(null);
     setForm({
       code: '',
@@ -105,6 +109,7 @@ export default function Inventory({ onNavigate }: InventoryProps) {
   };
 
   const openEditModel = (model: InventoryModel) => {
+    if (!permissions.canEditInventory) return;
     setEditingModel(model);
     setForm({
       code: model.code,
@@ -125,7 +130,10 @@ export default function Inventory({ onNavigate }: InventoryProps) {
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
+    if (editingModel && !permissions.canEditInventory) return;
+    if (!editingModel && !permissions.canCreateInventory) return;
     setSaving(true);
+    setErrorMessage('');
     try {
       let photoUrl = editingModel?.main_photo_url || '';
 
@@ -151,14 +159,17 @@ export default function Inventory({ onNavigate }: InventoryProps) {
       setPhotoFile(null);
       await loadData();
     } catch (err) {
-      console.error(err);
-      alert('Error al guardar el modelo');
+      const message = err instanceof Error ? err.message : 'Error desconocido al guardar el modelo';
+      console.error('[Inventory] Error al guardar modelo:', err);
+      setErrorMessage(message);
+      alert(message);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
+    if (!permissions.canDeleteInventory) return;
     try {
       await deleteModel(id);
       setDeleteConfirm(null);
@@ -212,11 +223,19 @@ export default function Inventory({ onNavigate }: InventoryProps) {
           <button onClick={exportInventory} className="px-3 py-2 bg-petrol-700 hover:bg-petrol-600 text-crudo-200 rounded-lg text-xs font-medium border border-petrol-600 flex items-center gap-1.5">
             <FileSpreadsheet size={14} /> CSV
           </button>
+          {permissions.canCreateInventory && (
           <button onClick={openNewModel} className="px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
             <Plus size={18} /> Nuevo Modelo
           </button>
+          )}
         </div>
       </div>
+
+      {errorMessage && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200">
+          {errorMessage}
+        </div>
+      )}
 
       {/* Stats */}
       {stats && (
@@ -369,20 +388,24 @@ export default function Inventory({ onNavigate }: InventoryProps) {
                         >
                           <Eye size={16} />
                         </button>
-                        <button
-                          onClick={() => openEditModel(model)}
-                          className="p-1.5 rounded text-petrol-500 hover:bg-petrol-50 dark:hover:bg-slate-700"
-                          title="Editar"
-                        >
-                          <Edit3 size={16} />
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirm(model.id)}
-                          className="p-1.5 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {permissions.canEditInventory && (
+                          <button
+                            onClick={() => openEditModel(model)}
+                            className="p-1.5 rounded text-petrol-500 hover:bg-petrol-50 dark:hover:bg-slate-700"
+                            title="Editar"
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                        )}
+                        {permissions.canDeleteInventory && (
+                          <button
+                            onClick={() => setDeleteConfirm(model.id)}
+                            className="p-1.5 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                         <button
                           onClick={() => onNavigate('library', undefined, undefined, model.id)}
                           className="p-1.5 rounded text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
@@ -528,7 +551,7 @@ export default function Inventory({ onNavigate }: InventoryProps) {
       )}
 
       {/* Delete confirmation */}
-      {deleteConfirm && (
+      {permissions.canDeleteInventory && deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="w-full max-w-sm bg-crudo-50 dark:bg-slate-800 rounded-xl shadow-xl border border-petrol-200 dark:border-slate-700 p-5">
             <h3 className="text-lg font-semibold text-petrol-800 dark:text-white mb-2">Eliminar modelo</h3>

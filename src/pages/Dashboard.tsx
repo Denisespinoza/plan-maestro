@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getDashboardStats } from '../lib/orders';
+import { useAuth } from '../lib/AuthContext';
 import {
   ClipboardList,
   Users,
@@ -58,6 +59,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
+  const { permissions } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -162,17 +164,20 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           bgClass="bg-crudo-50 dark:bg-slate-800"
           onClick={() => onNavigate('orders')}
         />
-        <StatCard
-          icon={TrendingUp}
-          label="Ventas totales"
-          value={formatCurrency(stats.totalSales)}
-          colorClass="bg-petrol-800"
-          bgClass="bg-crudo-50 dark:bg-slate-800"
-          onClick={() => onNavigate('finance')}
-        />
+        {permissions.canViewFinances && (
+          <StatCard
+            icon={TrendingUp}
+            label="Ventas totales"
+            value={formatCurrency(stats.totalSales)}
+            colorClass="bg-petrol-800"
+            bgClass="bg-crudo-50 dark:bg-slate-800"
+            onClick={() => onNavigate('finance')}
+          />
+        )}
       </div>
 
       {/* Financial summary */}
+      {permissions.canViewFinances && (
       <div className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-5 border border-petrol-200 dark:border-slate-700/50">
         <h2 className="text-sm font-semibold text-petrol-700 dark:text-petrol-300 uppercase tracking-wide mb-4">Resumen financiero</h2>
         <div className="grid grid-cols-3 gap-6">
@@ -201,35 +206,42 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </p>
         </div>
       </div>
+      )}
 
       {/* Quick actions */}
       <div className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-5 border border-petrol-200 dark:border-slate-700/50">
         <h2 className="text-sm font-semibold text-petrol-700 dark:text-petrol-300 uppercase tracking-wide mb-3">Acciones rápidas</h2>
         <div className="flex flex-wrap gap-3">
+          {permissions.canCreateOrders && (
           <button
             onClick={() => onNavigate('new-order')}
             className="px-5 py-3 bg-violet-500 hover:bg-violet-600 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm flex items-center gap-2"
           >
             <PlusCircle size={18} /> Nuevo pedido
           </button>
+          )}
+          {permissions.canCreateCustomers && (
           <button
             onClick={() => onNavigate('clients')}
             className="px-5 py-3 bg-petrol-600 hover:bg-petrol-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm flex items-center gap-2"
           >
             <Users size={18} /> Nuevo cliente
           </button>
+          )}
           <button
             onClick={() => onNavigate('orders')}
             className="px-5 py-3 bg-white dark:bg-slate-700 hover:bg-crudo-100 dark:hover:bg-slate-600 text-petrol-700 dark:text-petrol-300 rounded-xl text-sm font-medium border border-petrol-300 dark:border-slate-600 transition-colors"
           >
             Ver todos los pedidos
           </button>
+          {permissions.canViewFinances && (
           <button
             onClick={() => onNavigate('finance')}
             className="px-5 py-3 bg-white dark:bg-slate-700 hover:bg-crudo-100 dark:hover:bg-slate-600 text-petrol-700 dark:text-petrol-300 rounded-xl text-sm font-medium border border-petrol-300 dark:border-slate-600 transition-colors"
           >
             Resumen financiero
           </button>
+          )}
         </div>
       </div>
     </div>

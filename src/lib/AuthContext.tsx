@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { getPermissionsForRole, resolveRole, type AppPermissions, type AppRole } from './permissions';
 
 interface UserProfile {
   id: string;
@@ -13,6 +14,8 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   isAdmin: boolean;
+  role: AppRole;
+  permissions: AppPermissions;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -21,23 +24,11 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   isAdmin: false,
+  role: 'pendiente',
+  permissions: getPermissionsForRole('pendiente'),
   loading: true,
   signOut: async () => {},
 });
-
-const ADMIN_ROLES = new Set(['admin', 'administrator', 'administrador']);
-
-function normalizeRole(role: unknown): string {
-  return String(role ?? '').trim().toLowerCase();
-}
-
-function hasAdminRole(role: unknown): boolean {
-  return ADMIN_ROLES.has(normalizeRole(role));
-}
-
-function userHasAdminMetadata(user: User | null): boolean {
-  return hasAdminRole(user?.app_metadata?.role) || hasAdminRole(user?.user_metadata?.role);
-}
 
 async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await supabase
@@ -89,7 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{
       user,
       profile,
-      isAdmin: hasAdminRole(profile?.role) || userHasAdminMetadata(user),
+      isAdmin: resolveRole(profile?.role || user?.app_metadata?.role || user?.user_metadata?.role) === 'admin',
+      role: resolveRole(profile?.role || user?.app_metadata?.role || user?.user_metadata?.role),
+      permissions: getPermissionsForRole(profile?.role || user?.app_metadata?.role || user?.user_metadata?.role),
       loading,
       signOut,
     }}>

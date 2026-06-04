@@ -17,6 +17,7 @@ import {
   type MoldFile,
 } from '../lib/types';
 import { Upload, Save, Loader2, ChevronDown, Plus, X, User, Package, FileText } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 interface NewOrderProps {
   onNavigate: (page: string, orderId?: string, clientId?: string, modelId?: string) => void;
@@ -47,6 +48,7 @@ interface Order {
 }
 
 export default function NewOrder({ onNavigate, initialData }: NewOrderProps) {
+  const { permissions } = useAuth();
   const [form, setForm] = useState<Order>({
     customer_name: '',
     phone: '',
@@ -79,6 +81,7 @@ export default function NewOrder({ onNavigate, initialData }: NewOrderProps) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [moldFile, setMoldFile] = useState<File | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
   const imageRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
   const moldRef = useRef<HTMLInputElement>(null);
@@ -162,7 +165,8 @@ export default function NewOrder({ onNavigate, initialData }: NewOrderProps) {
   };
 
   const handleQuickCreateClient = async () => {
-    if (!newClientForm.business_name.trim()) return;
+    if (!newClientForm.business_name.trim() || !permissions.canCreateCustomers) return;
+    setErrorMessage('');
     try {
       const client = await createClient({
         business_name: newClientForm.business_name,
@@ -175,18 +179,25 @@ export default function NewOrder({ onNavigate, initialData }: NewOrderProps) {
       setNewClientForm({ business_name: '', phone: '', whatsapp: '' });
       loadData();
     } catch (err) {
-      console.error(err);
-      alert('Error al crear cliente');
+      const message = err instanceof Error ? err.message : 'Error desconocido al crear cliente';
+      console.error('[NewOrder] Error al crear cliente rápido:', err);
+      setErrorMessage(message);
+      alert(message);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!permissions.canCreateOrders) {
+      setErrorMessage('No tenés permisos para crear pedidos.');
+      return;
+    }
     if (!form.customer_name.trim()) {
       alert('Por favor, seleccioná o ingresá un cliente');
       return;
     }
     setSaving(true);
+    setErrorMessage('');
     try {
       let imageUrl = form.reference_image_url;
       let pdfUrl = form.pdf_file_url;
@@ -210,8 +221,10 @@ export default function NewOrder({ onNavigate, initialData }: NewOrderProps) {
       });
       onNavigate('order-detail', order.id);
     } catch (err) {
-      console.error(err);
-      alert('Error al crear el pedido. Por favor, intentá de nuevo.');
+      const message = err instanceof Error ? err.message : 'Error desconocido al crear el pedido';
+      console.error('[NewOrder] Error al crear pedido:', err);
+      setErrorMessage(message);
+      alert(message);
     } finally {
       setSaving(false);
     }
@@ -238,18 +251,26 @@ export default function NewOrder({ onNavigate, initialData }: NewOrderProps) {
         </div>
       </div>
 
+      {errorMessage && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200">
+          {errorMessage}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Cliente */}
         <div className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-5 border border-petrol-200 dark:border-slate-700/50 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-petrol-700 dark:text-petrol-300 uppercase tracking-wide">Cliente</h2>
-            <button
-              type="button"
-              onClick={() => setShowNewClientModal(true)}
-              className="text-xs text-violet-600 dark:text-violet-400 hover:underline flex items-center gap-1"
-            >
-              <Plus size={14} /> Cliente nuevo
-            </button>
+            {permissions.canCreateCustomers && (
+              <button
+                type="button"
+                onClick={() => setShowNewClientModal(true)}
+                className="text-xs text-violet-600 dark:text-violet-400 hover:underline flex items-center gap-1"
+              >
+                <Plus size={14} /> Cliente nuevo
+              </button>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative">
@@ -280,13 +301,15 @@ export default function NewOrder({ onNavigate, initialData }: NewOrderProps) {
                   ) : (
                     <div className="px-3 py-2.5 text-sm text-petrol-500 dark:text-petrol-400">
                       No se encontraron clientes
-                      <button
-                        type="button"
-                        onClick={() => setShowNewClientModal(true)}
-                        className="ml-2 text-violet-600 dark:text-violet-400 hover:underline"
-                      >
-                        Crear nuevo
-                      </button>
+                      {permissions.canCreateCustomers && (
+                        <button
+                          type="button"
+                          onClick={() => setShowNewClientModal(true)}
+                          className="ml-2 text-violet-600 dark:text-violet-400 hover:underline"
+                        >
+                          Crear nuevo
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

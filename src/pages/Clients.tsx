@@ -12,6 +12,7 @@ import { getWhatsAppLink } from '../lib/clients';
 import type { Client, ClientType, ClientStatus, Order } from '../lib/types';
 import { CLIENT_TYPE_CONFIG, CLIENT_STATUS_CONFIG, CLIENT_TYPE_OPTIONS, CLIENT_STATUS_OPTIONS, STATUS_CONFIG } from '../lib/types';
 import { Search, Plus, CreditCard as Edit3, Phone, MapPin, Star, MessageCircle, X, Save, Loader2, Building, Eye } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 interface ClientsProps {
   onNavigate: (page: string, orderId?: string, clientId?: string) => void;
@@ -23,6 +24,7 @@ interface ClientWithStats extends Client {
 }
 
 export default function Clients({ onNavigate }: ClientsProps) {
+  const { permissions } = useAuth();
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -34,6 +36,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
   const [clientOrders, setClientOrders] = useState<Order[]>([]);
   const [clientStats, setClientStats] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [form, setForm] = useState({
     business_name: '',
@@ -94,6 +97,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
   }, [clients, search, filterType, filterStatus]);
 
   const openNewClient = () => {
+    if (!permissions.canCreateCustomers) return;
     setEditingClient(null);
     setForm({
       business_name: '',
@@ -113,6 +117,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
   };
 
   const openEditClient = (client: Client) => {
+    if (!permissions.canEditCustomers) return;
     setEditingClient(client);
     setForm({
       business_name: client.business_name || '',
@@ -147,7 +152,10 @@ export default function Clients({ onNavigate }: ClientsProps) {
 
   const handleSave = async () => {
     if (!form.business_name.trim() && !form.contact_name.trim()) return;
+    if (editingClient && !permissions.canEditCustomers) return;
+    if (!editingClient && !permissions.canCreateCustomers) return;
     setSaving(true);
+    setErrorMessage('');
     try {
       if (editingClient) {
         await updateClient(editingClient.id, {
@@ -163,14 +171,17 @@ export default function Clients({ onNavigate }: ClientsProps) {
       setShowModal(false);
       loadClients();
     } catch (err) {
-      console.error(err);
-      alert('Error al guardar cliente');
+      const message = err instanceof Error ? err.message : 'Error desconocido al guardar cliente';
+      console.error('[Clients] Error al guardar cliente:', err);
+      setErrorMessage(message);
+      alert(message);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
+    if (!permissions.canDeleteCustomers) return;
     try {
       await deleteClient(id);
       setDeleteConfirm(null);
@@ -182,6 +193,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
   };
 
   const handleToggleFavorite = async (client: Client) => {
+    if (!permissions.canEditCustomers) return;
     try {
       await toggleClientFavorite(client.id, !client.is_favorite);
       loadClients();
@@ -216,13 +228,21 @@ export default function Clients({ onNavigate }: ClientsProps) {
           <h1 className="text-2xl font-bold text-petrol-800 dark:text-white">Clientes</h1>
           <p className="text-sm text-petrol-600 dark:text-petrol-400 mt-1">{filteredClients.length} clientes registrados</p>
         </div>
-        <button
+        {permissions.canCreateCustomers && (
+          <button
           onClick={openNewClient}
           className="px-4 py-2.5 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2"
         >
           <Plus size={18} /> Nuevo Cliente
-        </button>
+          </button>
+        )}
       </div>
+
+      {errorMessage && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200">
+          {errorMessage}
+        </div>
+      )}
 
       {/* Search and filters */}
       <div className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-4 border border-petrol-200 dark:border-slate-700 space-y-3">
@@ -283,6 +303,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
                     </h3>
                     <button
                       onClick={() => handleToggleFavorite(client)}
+                      disabled={!permissions.canEditCustomers}
                       className={`flex-shrink-0 ${client.is_favorite ? 'text-yellow-500' : 'text-petrol-300 hover:text-yellow-500'}`}
                     >
                       <Star size={14} fill={client.is_favorite ? 'currentColor' : 'none'} />
@@ -345,12 +366,14 @@ export default function Clients({ onNavigate }: ClientsProps) {
                     <MessageCircle size={14} />
                   </a>
                 )}
+                {permissions.canEditCustomers && (
                 <button
                   onClick={() => openEditClient(client)}
                   className="px-3 py-2 bg-white dark:bg-slate-700 hover:bg-petrol-100 dark:hover:bg-slate-600 text-petrol-600 dark:text-petrol-300 border border-petrol-200 dark:border-slate-600 rounded-lg text-xs font-medium transition-colors flex items-center justify-center"
                 >
                   <Edit3 size={14} />
                 </button>
+                )}
               </div>
             </div>
           ))}
@@ -636,19 +659,21 @@ export default function Clients({ onNavigate }: ClientsProps) {
                   <MessageCircle size={16} /> WhatsApp
                 </a>
               )}
+              {permissions.canEditCustomers && (
               <button
                 onClick={() => { setShowDetail(null); openEditClient(showDetail); }}
                 className="px-4 py-2.5 bg-petrol-600 hover:bg-petrol-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
               >
                 <Edit3 size={16} /> Editar
               </button>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* Delete confirmation */}
-      {deleteConfirm && (
+      {permissions.canDeleteCustomers && deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="w-full max-w-sm bg-crudo-50 dark:bg-slate-800 rounded-xl shadow-xl border border-petrol-200 dark:border-slate-700 p-5">
             <h3 className="text-lg font-semibold text-petrol-800 dark:text-white mb-2">Eliminar cliente</h3>

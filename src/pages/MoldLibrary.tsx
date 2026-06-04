@@ -24,6 +24,7 @@ import {
   Search,
   ExternalLink,
 } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 interface MoldLibraryProps {
   modelId?: string;
@@ -31,6 +32,7 @@ interface MoldLibraryProps {
 }
 
 export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
+  const { permissions } = useAuth();
   const [models, setModels] = useState<InventoryModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<InventoryModel | null>(null);
   const [files, setFiles] = useState<MoldFile[]>([]);
@@ -41,6 +43,7 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
   const [editingFile, setEditingFile] = useState<MoldFile | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [form, setForm] = useState({
     file_name: '',
@@ -84,7 +87,7 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
   });
 
   const openNewFile = () => {
-    if (!selectedModel) return;
+    if (!selectedModel || !permissions.canCreateLibrary) return;
     setEditingFile(null);
     setForm({ file_name: '', file_type: 'other', version: '', technical_notes: '', is_primary: false });
     setUploadFileState(null);
@@ -92,6 +95,7 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
   };
 
   const openEditFile = (file: MoldFile) => {
+    if (!permissions.canEditLibrary) return;
     setEditingFile(file);
     setForm({
       file_name: file.file_name,
@@ -107,7 +111,10 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
   const handleSave = async () => {
     if (!selectedModel) return;
     if (!uploadFileState && !editingFile) return;
+    if (editingFile && !permissions.canEditLibrary) return;
+    if (!editingFile && !permissions.canCreateLibrary) return;
     setSaving(true);
+    setErrorMessage('');
     try {
       let fileUrl = editingFile?.file_url || '';
       if (uploadFileState) {
@@ -133,14 +140,17 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
       setShowModal(false);
       loadData();
     } catch (err) {
-      console.error(err);
-      alert('Error al guardar el archivo');
+      const message = err instanceof Error ? err.message : 'Error desconocido al guardar el archivo';
+      console.error('[MoldLibrary] Error al guardar archivo:', err);
+      setErrorMessage(message);
+      alert(message);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
+    if (!permissions.canDeleteLibrary) return;
     try {
       await deleteMoldFile(id);
       setDeleteConfirm(null);
@@ -250,7 +260,7 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
                       <Eye size={14} /> Ver Archivos
                     </button>
                     <button
-                      onClick={() => { setSelectedModel(model); openNewFile(); }}
+                      onClick={() => { if (permissions.canCreateLibrary) { setSelectedModel(model); openNewFile(); } }}
                       className="px-3 py-2 bg-petrol-600 hover:bg-petrol-700 text-white rounded-lg text-xs font-semibold"
                     >
                       <Plus size={14} />
@@ -321,7 +331,7 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
           </button>
           <button
             onClick={openNewFile}
-            className="px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-semibold flex items-center gap-2"
+            className={permissions.canCreateLibrary ? 'px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-semibold flex items-center gap-2' : 'hidden'}
           >
             <Upload size={16} /> Subir Archivo
           </button>
@@ -333,9 +343,11 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
         <div className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-12 border border-petrol-200 dark:border-slate-700 text-center">
           <FileText size={40} className="mx-auto text-petrol-300 mb-3" />
           <p className="text-petrol-500 text-sm mb-4">Sin archivos en la biblioteca</p>
+          {permissions.canCreateLibrary && (
           <button onClick={openNewFile} className="px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm">
             Subir primer archivo
           </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -403,20 +415,24 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
                         >
                           <Download size={16} />
                         </a>
-                        <button
-                          onClick={() => openEditFile(file)}
-                          className="p-2 text-petrol-400 hover:text-petrol-600 hover:bg-petrol-50 dark:hover:bg-slate-600 rounded-lg"
-                          title="Editar"
-                        >
-                          <Save size={16} />
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirm(file.id)}
-                          className="p-2 text-petrol-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {permissions.canEditLibrary && (
+                          <button
+                            onClick={() => openEditFile(file)}
+                            className="p-2 text-petrol-400 hover:text-petrol-600 hover:bg-petrol-50 dark:hover:bg-slate-600 rounded-lg"
+                            title="Editar"
+                          >
+                            <Save size={16} />
+                          </button>
+                        )}
+                        {permissions.canDeleteLibrary && (
+                          <button
+                            onClick={() => setDeleteConfirm(file.id)}
+                            className="p-2 text-petrol-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -428,6 +444,12 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
       )}
 
       {/* File upload modal */}
+      {errorMessage && (
+        <div className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200">
+          {errorMessage}
+        </div>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="w-full max-w-md bg-crudo-50 dark:bg-slate-800 rounded-xl shadow-xl border border-petrol-200 dark:border-slate-700">
@@ -523,7 +545,7 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
       )}
 
       {/* Delete confirmation */}
-      {deleteConfirm && (
+      {permissions.canDeleteLibrary && deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="w-full max-w-sm bg-crudo-50 dark:bg-slate-800 rounded-xl shadow-xl border border-petrol-200 dark:border-slate-700 p-5">
             <h3 className="text-lg font-semibold text-petrol-800 dark:text-white mb-2">Eliminar archivo</h3>

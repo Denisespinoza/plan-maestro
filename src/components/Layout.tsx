@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTheme } from '../lib/theme';
+import type { AppPermissions } from '../lib/permissions';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -26,6 +27,7 @@ interface LayoutProps {
   onNavigate: (page: Page, orderId?: string, clientId?: string, modelId?: string) => void;
   children: React.ReactNode;
   isAdmin?: boolean;
+  permissions: AppPermissions;
   onLogout: () => void;
 }
 
@@ -47,7 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   { page: 'finance', label: 'Finanzas', icon: DollarSign },
 ];
 
-export default function Layout({ currentPage, onNavigate, children, isAdmin = false, onLogout }: LayoutProps) {
+export default function Layout({ currentPage, onNavigate, children, isAdmin = false, permissions, onLogout }: LayoutProps) {
   const { theme, toggleTheme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -56,7 +58,16 @@ export default function Layout({ currentPage, onNavigate, children, isAdmin = fa
     setSidebarOpen(false);
   };
 
-  const visibleNavItems = NAV_ITEMS;
+  const visibleNavItems = NAV_ITEMS.filter(item => {
+    if (item.page === 'finance') return permissions.canViewFinances;
+    if (item.page === 'personal') return permissions.canViewEmployees;
+    if (item.page === 'orders') return permissions.canViewOrders;
+    if (item.page === 'clients') return permissions.canViewCustomers;
+    if (item.page === 'inventory') return permissions.canViewInventory;
+    if (item.page === 'library') return permissions.canViewLibrary;
+    if (item.page === 'catalog') return permissions.canViewCatalog;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 transition-colors duration-200">
@@ -143,15 +154,17 @@ export default function Layout({ currentPage, onNavigate, children, isAdmin = fa
         </nav>
 
         {/* Quick new order button at bottom */}
-        <div className="absolute bottom-4 left-3 right-3">
-          <button
-            onClick={() => handleNav('new-order')}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-semibold transition-colors duration-150 text-sm shadow-lg shadow-teal-600/20"
-          >
-            <PlusCircle size={18} />
-            Nuevo Pedido
-          </button>
-        </div>
+        {permissions.canCreateOrders && (
+          <div className="absolute bottom-4 left-3 right-3">
+            <button
+              onClick={() => handleNav('new-order')}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-semibold transition-colors duration-150 text-sm shadow-lg shadow-teal-600/20"
+            >
+              <PlusCircle size={18} />
+              Nuevo Pedido
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* Main content */}

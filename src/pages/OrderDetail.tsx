@@ -5,6 +5,7 @@ import { STATUS_CONFIG, STATUS_OPTIONS, PRIORITY_CONFIG, PRIORITY_OPTIONS } from
 import { updateOrder, getOrderHistory, duplicateOrder } from '../lib/orders';
 import { getClientOrders, formatWhatsAppMessage, getWhatsAppLink } from '../lib/clients';
 import StatusBadge from '../components/StatusBadge';
+import { useAuth } from '../lib/AuthContext';
 import {
   ArrowLeft,
   Save,
@@ -30,6 +31,7 @@ interface OrderDetailProps {
 }
 
 export default function OrderDetail({ orderId, onNavigate }: OrderDetailProps) {
+  const { permissions } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [history, setHistory] = useState<OrderHistoryEntry[]>([]);
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
@@ -48,6 +50,7 @@ export default function OrderDetail({ orderId, onNavigate }: OrderDetailProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [showCustomerHistory, setShowCustomerHistory] = useState(false);
   const [showWhatsAppAlert, setShowWhatsAppAlert] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     loadOrder();
@@ -84,15 +87,18 @@ export default function OrderDetail({ orderId, onNavigate }: OrderDetailProps) {
         }
       }
     } catch (err) {
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'Error desconocido al guardar pedido';
+      console.error('[OrderDetail] Error al guardar pedido:', err);
+      setErrorMessage(message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!order) return;
+    if (!order || !permissions.canEditOrders) return;
     setSaving(true);
+    setErrorMessage('');
     try {
       await updateOrder(order.id, {
         status: editStatus,
@@ -106,15 +112,18 @@ export default function OrderDetail({ orderId, onNavigate }: OrderDetailProps) {
       setEditing(false);
       loadOrder();
     } catch (err) {
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'Error desconocido al cambiar estado';
+      console.error('[OrderDetail] Error al cambiar estado:', err);
+      setErrorMessage(message);
     } finally {
       setSaving(false);
     }
   };
 
   const handleStatusChange = async (newStatus: OrderStatus) => {
-    if (!order) return;
+    if (!order || !permissions.canEditOrders) return;
     try {
+      setErrorMessage('');
       await updateOrder(order.id, { status: newStatus });
       loadOrder();
     } catch (err) {
@@ -123,6 +132,7 @@ export default function OrderDetail({ orderId, onNavigate }: OrderDetailProps) {
   };
 
   const handleDuplicate = async () => {
+    if (!permissions.canCreateOrders) return;
     try {
       await duplicateOrder(orderId);
       onNavigate('orders');
@@ -194,13 +204,21 @@ export default function OrderDetail({ orderId, onNavigate }: OrderDetailProps) {
             {order.article_name && <span className="ml-2 text-violet-600 dark:text-violet-400">- {order.article_name}</span>}
           </p>
         </div>
+        {permissions.canEditOrders && (
         <button
           onClick={() => setEditing(!editing)}
           className="px-4 py-2 bg-petrol-600 hover:bg-petrol-700 text-white rounded-lg text-xs font-semibold transition-colors"
         >
           {editing ? 'Cancelar' : 'Editar'}
         </button>
+        )}
       </div>
+
+      {errorMessage && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200">
+          {errorMessage}
+        </div>
+      )}
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-2">
@@ -210,6 +228,7 @@ export default function OrderDetail({ orderId, onNavigate }: OrderDetailProps) {
         >
           <MessageCircle size={18} /> Enviar WhatsApp
         </button>
+        {permissions.canEditOrders && (
         <button
           onClick={() => handleStatusChange('listo_entregar')}
           disabled={order.status === 'listo_entregar'}
@@ -217,6 +236,8 @@ export default function OrderDetail({ orderId, onNavigate }: OrderDetailProps) {
         >
           <CheckCircle2 size={16} /> Marcar listo
         </button>
+        )}
+        {permissions.canEditOrders && (
         <button
           onClick={() => handleStatusChange('entregado')}
           disabled={order.status === 'entregado'}
@@ -224,12 +245,15 @@ export default function OrderDetail({ orderId, onNavigate }: OrderDetailProps) {
         >
           <Truck size={16} /> Marcar entregado
         </button>
+        )}
+        {permissions.canCreateOrders && (
         <button
           onClick={handleDuplicate}
           className="px-4 py-2.5 bg-white dark:bg-slate-700 hover:bg-crudo-100 dark:hover:bg-slate-600 text-petrol-600 dark:text-petrol-300 border border-petrol-200 dark:border-slate-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
         >
           <Copy size={16} /> Duplicar
         </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
