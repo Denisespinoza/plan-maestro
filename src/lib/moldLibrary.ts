@@ -38,7 +38,10 @@ export async function createMoldFile(moldFile: Partial<MoldFile>): Promise<MoldF
     .select()
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[createMoldFile] Supabase error:', error);
+    throw new Error(`Error al crear archivo de biblioteca: ${error.message} (código: ${error.code})`);
+  }
   return data!;
 }
 
@@ -53,7 +56,10 @@ export async function updateMoldFile(id: string, updates: Partial<MoldFile>): Pr
     .select()
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[updateMoldFile] Supabase error:', error);
+    throw new Error(`Error al editar archivo de biblioteca: ${error.message} (código: ${error.code})`);
+  }
   return data!;
 }
 

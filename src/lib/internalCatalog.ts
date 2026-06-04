@@ -36,7 +36,10 @@ export async function createCatalogItem(item: Partial<CatalogItem>): Promise<Cat
     .select()
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[createCatalogItem] Supabase error:', error);
+    throw new Error(`Error al crear artículo de catálogo: ${error.message} (código: ${error.code})`);
+  }
   return data!;
 }
 
@@ -51,7 +54,10 @@ export async function updateCatalogItem(id: string, updates: Partial<CatalogItem
     .select()
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[updateCatalogItem] Supabase error:', error);
+    throw new Error(`Error al editar artículo de catálogo: ${error.message} (código: ${error.code})`);
+  }
   return data!;
 }
 

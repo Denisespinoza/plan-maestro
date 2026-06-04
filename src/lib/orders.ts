@@ -56,7 +56,11 @@ export async function createOrder(order: Partial<Order>): Promise<Order> {
   await addHistoryEntry(data.id, 'Pedido creado', '', orderNumber);
 
   if (order.garment_type) {
-    await incrementGarmentType(order.garment_type);
+    try {
+      await incrementGarmentType(order.garment_type);
+    } catch (err) {
+      console.warn('[createOrder] Pedido creado, pero no se pudo actualizar el contador de tipo de prenda:', err);
+    }
   }
 
   return data!;
@@ -158,9 +162,11 @@ export async function incrementGarmentType(name: string): Promise<void> {
     .maybeSingle();
 
   if (existing) {
-    await supabase.from('garment_types').update({ usage_count: existing.usage_count + 1 }).eq('id', existing.id);
+    const { error } = await supabase.from('garment_types').update({ usage_count: existing.usage_count + 1 }).eq('id', existing.id);
+    if (error) throw error;
   } else {
-    await supabase.from('garment_types').insert({ name, usage_count: 1 });
+    const { error } = await supabase.from('garment_types').insert({ name, usage_count: 1 });
+    if (error) throw error;
   }
 }
 

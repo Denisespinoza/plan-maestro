@@ -18,12 +18,14 @@ import {
   CATALOG_TAG_OPTIONS,
 } from '../lib/types';
 import { Search, Plus, CreditCard as Edit3, Trash2, Filter, X, Save, Loader2, Upload, Image as ImageIcon, ZoomIn, ExternalLink } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 interface InternalCatalogProps {
   onNavigate: (page: string, orderId?: string, clientId?: string, modelId?: string) => void;
 }
 
 export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
+  const { permissions } = useAuth();
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [models, setModels] = useState<InventoryModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,7 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [form, setForm] = useState({
     code: '',
@@ -101,6 +104,7 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
   }, [items, search, filterCategory, filterStatus, filterTag, filterWithPhoto]);
 
   const openNewItem = () => {
+    if (!permissions.canCreateCatalog) return;
     setEditingItem(null);
     setForm({
       code: '',
@@ -118,6 +122,7 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
   };
 
   const openEditItem = (item: CatalogItem) => {
+    if (!permissions.canEditCatalog) return;
     setEditingItem(item);
     setForm({
       code: item.code,
@@ -136,7 +141,10 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
+    if (editingItem && !permissions.canEditCatalog) return;
+    if (!editingItem && !permissions.canCreateCatalog) return;
     setSaving(true);
+    setErrorMessage('');
     try {
       let photoUrl = editingItem?.photo_url || '';
 
@@ -170,14 +178,17 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
       setPhotoFile(null);
       await loadData();
     } catch (err) {
-      console.error(err);
-      alert('Error al guardar');
+      const message = err instanceof Error ? err.message : 'Error desconocido al guardar';
+      console.error('[InternalCatalog] Error al guardar:', err);
+      setErrorMessage(message);
+      alert(message);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
+    if (!permissions.canDeleteCatalog) return;
     try {
       await deleteCatalogItem(id);
       setDeleteConfirm(null);
@@ -219,10 +230,18 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
           <h1 className="text-2xl font-bold text-crudo-100">Catálogo Interno</h1>
           <p className="text-sm text-crudo-400 mt-1">{filteredItems.length} imágenes privadas</p>
         </div>
+        {permissions.canCreateCatalog && (
         <button onClick={openNewItem} className="px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
           <Plus size={18} /> Nueva Imagen
         </button>
+        )}
       </div>
+
+      {errorMessage && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200">
+          {errorMessage}
+        </div>
+      )}
 
       {/* Stats */}
       {stats && (
@@ -399,18 +418,22 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
                   >
                     <ZoomIn size={14} /> Ver
                   </button>
-                  <button
-                    onClick={() => openEditItem(item)}
-                    className="px-3 py-2 bg-white dark:bg-slate-700 hover:bg-crudo-100 dark:hover:bg-slate-600 text-petrol-600 dark:text-petrol-300 border border-petrol-200 dark:border-slate-600 rounded-lg text-xs"
-                  >
-                    <Edit3 size={14} />
-                  </button>
-                  <button
-                    onClick={() => setDeleteConfirm(item.id)}
-                    className="px-3 py-2 bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 border border-petrol-200 dark:border-slate-600 rounded-lg text-xs"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {permissions.canEditCatalog && (
+                    <button
+                      onClick={() => openEditItem(item)}
+                      className="px-3 py-2 bg-white dark:bg-slate-700 hover:bg-crudo-100 dark:hover:bg-slate-600 text-petrol-600 dark:text-petrol-300 border border-petrol-200 dark:border-slate-600 rounded-lg text-xs"
+                    >
+                      <Edit3 size={14} />
+                    </button>
+                  )}
+                  {permissions.canDeleteCatalog && (
+                    <button
+                      onClick={() => setDeleteConfirm(item.id)}
+                      className="px-3 py-2 bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 border border-petrol-200 dark:border-slate-600 rounded-lg text-xs"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                   {item.model_id && (
                     <button
                       onClick={() => onNavigate('library', undefined, undefined, item.model_id!)}
@@ -645,7 +668,7 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
       )}
 
       {/* Delete confirmation */}
-      {deleteConfirm && (
+      {permissions.canDeleteCatalog && deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="w-full max-w-sm bg-crudo-50 dark:bg-slate-800 rounded-xl shadow-xl border border-petrol-200 dark:border-slate-700 p-5">
             <h3 className="text-lg font-semibold text-petrol-800 dark:text-white mb-2">Eliminar imagen</h3>

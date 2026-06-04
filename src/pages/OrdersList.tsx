@@ -6,6 +6,7 @@ import { updateOrder, duplicateOrder } from '../lib/orders';
 import { formatWhatsAppMessage, getWhatsAppLink } from '../lib/clients';
 import { exportToCSV, exportToPDFSimple } from '../lib/exports';
 import StatusBadge from '../components/StatusBadge';
+import { useAuth } from '../lib/AuthContext';
 import { Search, Filter, Import as SortAsc, Dessert as SortDesc, FileDown, FileSpreadsheet, Copy, CreditCard as Edit3, Check, X, Eye, MessageCircle } from 'lucide-react';
 
 interface OrdersListProps {
@@ -75,6 +76,7 @@ const isUrgentOrder = (order: OrderWithOptionalFields) => {
 };
 
 export default function OrdersList({ onNavigate }: OrdersListProps) {
+  const { permissions } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -87,6 +89,7 @@ export default function OrdersList({ onNavigate }: OrdersListProps) {
   const [editPaid, setEditPaid] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('todos');
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     loadOrders();
@@ -101,7 +104,9 @@ export default function OrdersList({ onNavigate }: OrdersListProps) {
       if (error) throw error;
       setOrders(data || []);
     } catch (err) {
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'Error desconocido al editar pedido';
+      console.error('[OrdersList] Error al editar pedido:', err);
+      setErrorMessage(message);
     } finally {
       setLoading(false);
     }
@@ -165,7 +170,9 @@ export default function OrdersList({ onNavigate }: OrdersListProps) {
   }, [orders, quickFilter, search, statusFilter, priorityFilter, sortField, sortDir]);
 
   const handleQuickEdit = async (orderId: string) => {
+    if (!permissions.canEditOrders) return;
     try {
+      setErrorMessage('');
       const updates: Partial<Order> = {};
       if (editStatus) updates.status = editStatus;
       if (editPaid !== '') updates.paid_amount = parseFloat(editPaid) || 0;
@@ -173,18 +180,23 @@ export default function OrdersList({ onNavigate }: OrdersListProps) {
       setEditingId(null);
       loadOrders();
     } catch (err) {
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'Error desconocido al duplicar pedido';
+      console.error('[OrdersList] Error al duplicar pedido:', err);
+      setErrorMessage(message);
     }
   };
 
   const startEdit = (order: Order) => {
+    if (!permissions.canEditOrders) return;
     setEditingId(order.id);
     setEditStatus(order.status);
     setEditPaid(String(order.paid_amount));
   };
 
   const handleDuplicate = async (orderId: string) => {
+    if (!permissions.canCreateOrders) return;
     try {
+      setErrorMessage('');
       await duplicateOrder(orderId);
       loadOrders();
     } catch (err) {
@@ -236,14 +248,22 @@ export default function OrdersList({ onNavigate }: OrdersListProps) {
           >
             <FileDown size={14} /> PDF
           </button>
+          {permissions.canCreateOrders && (
           <button
             onClick={() => onNavigate('new-order')}
             className="px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-xs font-semibold transition-colors shadow-lg shadow-violet-500/20"
           >
             + Nuevo Pedido
           </button>
+          )}
         </div>
       </div>
+
+      {errorMessage && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200">
+          {errorMessage}
+        </div>
+      )}
 
       {/* Search & Filters */}
       <div className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-4 border border-petrol-200 dark:border-slate-700/50 space-y-3">
@@ -417,6 +437,7 @@ export default function OrdersList({ onNavigate }: OrdersListProps) {
                         >
                           <Eye size={16} />
                         </button>
+                        {permissions.canEditOrders && (
                         <button
                           onClick={() => startEdit(order)}
                           className="p-2 text-petrol-400 hover:text-petrol-600 hover:bg-crudo-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
@@ -424,6 +445,8 @@ export default function OrdersList({ onNavigate }: OrdersListProps) {
                         >
                           <Edit3 size={16} />
                         </button>
+                        )}
+                        {permissions.canCreateOrders && (
                         <button
                           onClick={() => handleDuplicate(order.id)}
                           className="p-2 text-petrol-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
@@ -431,6 +454,7 @@ export default function OrdersList({ onNavigate }: OrdersListProps) {
                         >
                           <Copy size={16} />
                         </button>
+                        )}
                       </>
                     )}
                   </div>
