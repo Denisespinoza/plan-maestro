@@ -62,8 +62,10 @@ export default function Personal() {
       ]);
       setEmployees(employeesData);
       setStats(statsData);
+      return employeesData;
     } catch (err) {
       console.error(err);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -113,13 +115,14 @@ export default function Personal() {
     if (!employeeForm.name.trim()) return;
     setSaving(true);
     try {
-      if (editingEmployee) {
-        await updateEmployee(editingEmployee.id, employeeForm);
-      } else {
-        await createEmployee(employeeForm);
-      }
+      const savedEmployee = editingEmployee
+        ? await updateEmployee(editingEmployee.id, employeeForm)
+        : await createEmployee(employeeForm);
       setShowEmployeeModal(false);
-      loadData();
+      const employeesData = await loadData();
+      if (selectedEmployee?.id === savedEmployee.id) {
+        setSelectedEmployee(employeesData.find(employee => employee.id === savedEmployee.id) || savedEmployee);
+      }
     } catch (err) {
       console.error(err);
       alert('Error al guardar empleado');
