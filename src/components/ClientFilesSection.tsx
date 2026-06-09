@@ -6,7 +6,6 @@ import {
   deleteClientFile,
   formatFileSize,
   getClientFiles,
-  getFileExtension,
   isPreviewableClientFile,
   MAX_CLIENT_FILE_SIZE_BYTES,
   uploadClientFile,
@@ -30,6 +29,10 @@ function getCategoryLabel(category?: ClientFileCategory | null): string {
   return CLIENT_FILE_CATEGORIES.find(option => option.value === category)?.label || 'Sin categoría';
 }
 
+function getErrorMessage(err: unknown, fallback: string) {
+  return err instanceof Error ? err.message : fallback;
+}
+
 function getFileIcon(file: ClientFile) {
   const extension = (file.file_extension || '').toLowerCase();
 
@@ -45,6 +48,7 @@ export default function ClientFilesSection({ clientId }: ClientFilesSectionProps
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadStatuses, setUploadStatuses] = useState<UploadStatus[]>([]);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ClientFileCategory | 'todos' | 'imagen'>('todos');
   const [category, setCategory] = useState<ClientFileCategory | ''>('');
@@ -53,12 +57,14 @@ export default function ClientFilesSection({ clientId }: ClientFilesSectionProps
 
   const loadFiles = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const data = await getClientFiles(clientId);
       setFiles(data);
     } catch (err) {
-      console.error(err);
-      setUploadStatuses([{ fileName: 'Biblioteca', status: 'error', message: 'No se pudieron cargar los archivos del cliente.' }]);
+      const message = getErrorMessage(err, 'No se pudieron cargar los archivos del cliente.');
+      console.error('Error loading client files in section:', { clientId, error: err });
+      setLoadError(message);
     } finally {
       setLoading(false);
     }
@@ -98,30 +104,35 @@ export default function ClientFilesSection({ clientId }: ClientFilesSectionProps
     const selectedFiles = Array.from(fileList);
     if (selectedFiles.length === 0) return;
 
+    if (!clientId?.trim()) {
+      const message = 'El cliente no tiene ID válido. Cerrá el detalle y volvé a abrir el cliente.';
+      console.error('Error selecting client files:', { clientId, message });
+      setUploadStatuses([{ fileName: 'Cliente', status: 'error', message }]);
+      return;
+    }
+
     setUploading(true);
     setUploadStatuses(selectedFiles.map(file => ({ fileName: file.name, status: 'pending', message: 'En espera' })));
 
-    for (const file of selectedFiles) {
-      updateUploadStatus(file.name, { status: 'uploading', message: 'Subiendo...' });
+    try {
+      for (const file of selectedFiles) {
+        updateUploadStatus(file.name, { status: 'uploading', message: 'Subiendo...' });
 
-      try {
-        const extension = getFileExtension(file.name);
-        if (!extension) throw new Error('El archivo no tiene extensión.');
-        if (file.size > MAX_CLIENT_FILE_SIZE_BYTES) {
-          throw new Error(`Supera el tamaño máximo de ${formatFileSize(MAX_CLIENT_FILE_SIZE_BYTES)}.`);
+        try {
+          await uploadClientFile(clientId, file, category, notes);
+          updateUploadStatus(file.name, { status: 'success', message: 'Subido correctamente' });
+        } catch (err) {
+          const message = getErrorMessage(err, 'Error desconocido al subir archivo.');
+          console.error('Error uploading selected client file:', { clientId, fileName: file.name, error: err });
+          updateUploadStatus(file.name, { status: 'error', message });
         }
-
-        await uploadClientFile(clientId, file, category, notes);
-        updateUploadStatus(file.name, { status: 'success', message: 'Subido correctamente' });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Error al subir archivo';
-        updateUploadStatus(file.name, { status: 'error', message });
       }
-    }
 
-    await loadFiles();
-    setUploading(false);
-    if (inputRef.current) inputRef.current.value = '';
+      await loadFiles();
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -135,8 +146,9 @@ export default function ClientFilesSection({ clientId }: ClientFilesSectionProps
       const url = await createClientFileSignedUrl(file);
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      console.error(err);
-      alert('No se pudo abrir la vista previa del archivo.');
+      const message = getErrorMessage(err, 'No se pudo abrir la vista previa del archivo.');
+      console.error('Error previewing client file:', { file, error: err });
+      alert(message);
     }
   };
 
@@ -150,8 +162,9 @@ export default function ClientFilesSection({ clientId }: ClientFilesSectionProps
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      console.error(err);
-      alert('No se pudo descargar el archivo.');
+      const message = getErrorMessage(err, 'No se pudo descargar el archivo.');
+      console.error('Error downloading client file:', { file, error: err });
+      alert(message);
     }
   };
 
@@ -164,8 +177,9 @@ export default function ClientFilesSection({ clientId }: ClientFilesSectionProps
       await deleteClientFile(file);
       setFiles(current => current.filter(item => item.id !== file.id));
     } catch (err) {
-      console.error(err);
-      alert('No se pudo eliminar el archivo.');
+      const message = getErrorMessage(err, 'No se pudo eliminar el archivo.');
+      console.error('Error deleting client file:', { file, error: err });
+      alert(message);
     } finally {
       setDeletingId(null);
     }
@@ -215,6 +229,12 @@ export default function ClientFilesSection({ clientId }: ClientFilesSectionProps
           Se guardan intactos en Supabase Storage. Máximo recomendado: {formatFileSize(MAX_CLIENT_FILE_SIZE_BYTES)} por archivo.
         </p>
       </div>
+
+      {loadError && (
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
+          {loadError}
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
