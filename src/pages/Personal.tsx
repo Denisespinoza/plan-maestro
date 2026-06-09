@@ -9,6 +9,7 @@ import {
   deletePayment,
   formatCurrency,
   formatMinutes,
+  normalizeTimeValue,
   getEmployeeAttendance,
   getEmployeePayments,
   getEmployees,
@@ -36,6 +37,7 @@ import { Users, Plus, CreditCard as Edit3, Trash2, Clock, DollarSign, X, Save, L
 const TODAY = new Date().toISOString().split('T')[0];
 const CURRENT_MONTH = TODAY.slice(0, 7);
 const ANA_HOURLY_RATE = 5072.46;
+const ANA_MONTHLY_GOAL_LABEL = '$700.000';
 
 type PersonalStats = {
   totalEmployees: number;
@@ -73,8 +75,20 @@ function getEmployeeRate(employee: Employee | null) {
   return Number(employee.hourly_rate) || (isAna(employee) ? ANA_HOURLY_RATE : 0);
 }
 
-function toTimeInput(value?: string | null) {
-  return value ? value.slice(0, 5) : '';
+function getEmployeeCompensationSummary(employee: Employee) {
+  if (isAna(employee)) return `Objetivo mensual: ${ANA_MONTHLY_GOAL_LABEL}`;
+  if (employee.payment_type === 'por_hora') return 'Pago variable';
+  return `Mensual: ${formatCurrency(Number(employee.monthly_salary))}`;
+}
+
+function normalizeAttendanceForm(form: AttendanceForm): AttendanceForm {
+  return {
+    ...form,
+    morning_start: normalizeTimeValue(form.morning_start),
+    morning_end: normalizeTimeValue(form.morning_end),
+    afternoon_start: normalizeTimeValue(form.afternoon_start),
+    afternoon_end: normalizeTimeValue(form.afternoon_end),
+  };
 }
 
 function monthLabel(month: string) {
@@ -163,10 +177,10 @@ export default function Personal() {
 
   const attendanceToForm = (item: EmployeeAttendance | null, workDate = TODAY): AttendanceForm => ({
     work_date: item?.work_date || item?.date || workDate,
-    morning_start: toTimeInput(item?.morning_start),
-    morning_end: toTimeInput(item?.morning_end),
-    afternoon_start: toTimeInput(item?.afternoon_start),
-    afternoon_end: toTimeInput(item?.afternoon_end),
+    morning_start: normalizeTimeValue(item?.morning_start),
+    morning_end: normalizeTimeValue(item?.morning_end),
+    afternoon_start: normalizeTimeValue(item?.afternoon_start),
+    afternoon_end: normalizeTimeValue(item?.afternoon_end),
     notes: item?.notes || '',
   });
 
@@ -267,15 +281,16 @@ export default function Personal() {
     if (!selectedEmployee) return;
     setSaving(true);
     try {
+      const normalizedForm = normalizeAttendanceForm(form);
       const saved = await upsertAttendance({
         employee_id: selectedEmployee.id,
         work_date: TODAY,
-        morning_start: form.morning_start || null,
-        morning_end: form.morning_end || null,
-        afternoon_start: form.afternoon_start || null,
-        afternoon_end: form.afternoon_end || null,
+        morning_start: normalizedForm.morning_start || null,
+        morning_end: normalizedForm.morning_end || null,
+        afternoon_start: normalizedForm.afternoon_start || null,
+        afternoon_end: normalizedForm.afternoon_end || null,
         hourly_rate: getEmployeeRate(selectedEmployee),
-        notes: form.notes || null,
+        notes: normalizedForm.notes || null,
       });
       setAttendance(saved);
       await refreshEmployeeDetail(selectedEmployee, selectedMonth);
@@ -312,27 +327,28 @@ export default function Personal() {
     if (!selectedEmployee) return;
     setSaving(true);
     try {
+      const normalizedForm = normalizeAttendanceForm(attendanceForm);
       if (editingAttendance) {
         await updateAttendance(editingAttendance.id, {
           employee_id: selectedEmployee.id,
-          work_date: attendanceForm.work_date,
-          morning_start: attendanceForm.morning_start || null,
-          morning_end: attendanceForm.morning_end || null,
-          afternoon_start: attendanceForm.afternoon_start || null,
-          afternoon_end: attendanceForm.afternoon_end || null,
+          work_date: normalizedForm.work_date,
+          morning_start: normalizedForm.morning_start || null,
+          morning_end: normalizedForm.morning_end || null,
+          afternoon_start: normalizedForm.afternoon_start || null,
+          afternoon_end: normalizedForm.afternoon_end || null,
           hourly_rate: Number(editingAttendance.hourly_rate) || getEmployeeRate(selectedEmployee),
-          notes: attendanceForm.notes || null,
+          notes: normalizedForm.notes || null,
         });
       } else {
         await upsertAttendance({
           employee_id: selectedEmployee.id,
-          work_date: attendanceForm.work_date,
-          morning_start: attendanceForm.morning_start || null,
-          morning_end: attendanceForm.morning_end || null,
-          afternoon_start: attendanceForm.afternoon_start || null,
-          afternoon_end: attendanceForm.afternoon_end || null,
+          work_date: normalizedForm.work_date,
+          morning_start: normalizedForm.morning_start || null,
+          morning_end: normalizedForm.morning_end || null,
+          afternoon_start: normalizedForm.afternoon_start || null,
+          afternoon_end: normalizedForm.afternoon_end || null,
           hourly_rate: getEmployeeRate(selectedEmployee),
-          notes: attendanceForm.notes || null,
+          notes: normalizedForm.notes || null,
         });
       }
       setShowAttendanceModal(false);
@@ -401,10 +417,10 @@ export default function Personal() {
   const todayPreview = buildAttendancePayload({
     employee_id: selectedEmployee?.id || '',
     work_date: TODAY,
-    morning_start: todayForm.morning_start || null,
-    morning_end: todayForm.morning_end || null,
-    afternoon_start: todayForm.afternoon_start || null,
-    afternoon_end: todayForm.afternoon_end || null,
+    morning_start: normalizeTimeValue(todayForm.morning_start) || null,
+    morning_end: normalizeTimeValue(todayForm.morning_end) || null,
+    afternoon_start: normalizeTimeValue(todayForm.afternoon_start) || null,
+    afternoon_end: normalizeTimeValue(todayForm.afternoon_end) || null,
     hourly_rate: currentRate,
     notes: todayForm.notes || null,
   });
@@ -477,7 +493,7 @@ export default function Personal() {
                     </span>
                   </div>
                   <p className="text-xs text-petrol-400 mt-1">
-                    {emp.payment_type === 'por_hora' ? `Hora: ${formatCurrency(getEmployeeRate(emp))}` : `Mensual: ${formatCurrency(Number(emp.monthly_salary))}`}
+                    {getEmployeeCompensationSummary(emp)}
                   </p>
                 </button>
               ))
@@ -502,7 +518,7 @@ export default function Personal() {
                         {selectedEmployee.position || 'Sin rol'}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded ${PAYMENT_TYPE_CONFIG[selectedEmployee.payment_type || 'mensual'].color}`}>
-                        {PAYMENT_TYPE_CONFIG[selectedEmployee.payment_type || 'mensual'].label}
+                        {isAna(selectedEmployee) ? 'Objetivo mensual' : PAYMENT_TYPE_CONFIG[selectedEmployee.payment_type || 'mensual'].label}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${EMPLOYEE_STATUS_CONFIG[selectedEmployee.status as EmployeeStatus]?.bgClass} ${EMPLOYEE_STATUS_CONFIG[selectedEmployee.status as EmployeeStatus]?.textClass}`}>
                         {EMPLOYEE_STATUS_CONFIG[selectedEmployee.status as EmployeeStatus]?.label}
@@ -530,7 +546,7 @@ export default function Personal() {
                 </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4 pt-4 border-t border-petrol-100 dark:border-slate-700">
-                  <SummaryCard label="Valor hora" value={formatCurrency(currentRate)} />
+                  {isAna(selectedEmployee) && <SummaryCard label="Objetivo mensual" value={ANA_MONTHLY_GOAL_LABEL} />}
                   <SummaryCard label={`Horas ${monthLabel(selectedMonth)}`} value={formatMinutes(monthlySummary.totalMinutes)} />
                   <SummaryCard label="Sueldo generado" value={formatCurrency(generatedForEmployee)} />
                   <SummaryCard label="Pagado este mes" value={formatCurrency(totalPaid)} valueClass="text-emerald-600" />
@@ -585,11 +601,11 @@ export default function Personal() {
                       ) : attendanceHistory.map(item => (
                         <tr key={item.id} className="text-petrol-700 dark:text-petrol-200">
                           <td className="px-3 py-2 whitespace-nowrap">{new Date(`${item.work_date}T00:00:00`).toLocaleDateString('es-AR')}</td>
-                          <td className="px-3 py-2">{toTimeInput(item.morning_start) || '-'}</td>
-                          <td className="px-3 py-2">{toTimeInput(item.morning_end) || '-'}</td>
+                          <td className="px-3 py-2">{normalizeTimeValue(item.morning_start) || '-'}</td>
+                          <td className="px-3 py-2">{normalizeTimeValue(item.morning_end) || '-'}</td>
                           <td className="px-3 py-2">{formatMinutes(item.morning_minutes)}</td>
-                          <td className="px-3 py-2">{toTimeInput(item.afternoon_start) || '-'}</td>
-                          <td className="px-3 py-2">{toTimeInput(item.afternoon_end) || '-'}</td>
+                          <td className="px-3 py-2">{normalizeTimeValue(item.afternoon_start) || '-'}</td>
+                          <td className="px-3 py-2">{normalizeTimeValue(item.afternoon_end) || '-'}</td>
                           <td className="px-3 py-2">{formatMinutes(item.afternoon_minutes)}</td>
                           <td className="px-3 py-2 font-semibold">{formatMinutes(item.total_minutes)}</td>
                           <td className="px-3 py-2 font-semibold text-emerald-600">{formatCurrency(item.total_amount)}</td>
@@ -749,7 +765,7 @@ function ShiftInput({ label, value, onChange, onMark, buttonLabel, icon }: { lab
     <div className="bg-white/70 dark:bg-slate-900/30 rounded-lg p-3 border border-petrol-100 dark:border-slate-700">
       <label className="block text-xs font-medium text-petrol-600 dark:text-petrol-400 mb-1">{label}</label>
       <div className="flex gap-2">
-        <input type="time" value={value} onChange={e => onChange(e.target.value)} className="flex-1 px-3 py-2 bg-white dark:bg-slate-700 border border-petrol-200 dark:border-slate-600 rounded-lg text-sm" />
+        <input type="time" step="60" value={normalizeTimeValue(value)} onChange={e => onChange(normalizeTimeValue(e.target.value))} className="flex-1 px-3 py-2 bg-white dark:bg-slate-700 border border-petrol-200 dark:border-slate-600 rounded-lg text-sm" />
         <button onClick={onMark} className="px-3 py-2 bg-petrol-600 hover:bg-petrol-700 text-white rounded-lg text-xs flex items-center gap-1 whitespace-nowrap">
           {icon} {buttonLabel}
         </button>
@@ -773,10 +789,13 @@ function Modal({ title, children, onClose, maxWidth }: { title: string; children
 }
 
 function Input({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+  const inputValue = type === 'time' ? normalizeTimeValue(value) : value;
+  const step = type === 'time' ? '60' : undefined;
+  const handleChange = (value: string) => onChange(type === 'time' ? normalizeTimeValue(value) : value);
   return (
     <div>
       <label className="block text-xs font-medium text-petrol-600 dark:text-petrol-400 mb-1">{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-petrol-200 dark:border-slate-600 rounded-lg text-sm" />
+      <input type={type} step={step} value={inputValue} onChange={e => handleChange(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-petrol-200 dark:border-slate-600 rounded-lg text-sm" />
     </div>
   );
 }

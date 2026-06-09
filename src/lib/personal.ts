@@ -21,9 +21,13 @@ export interface MonthlyEmployeeSummary {
   pending: number;
 }
 
-function normalizeTime(value?: string | null) {
-  if (!value) return null;
+export function normalizeTimeValue(value?: string | null) {
+  if (!value) return '';
   return value.slice(0, 5);
+}
+
+function normalizeTime(value?: string | null) {
+  return normalizeTimeValue(value) || null;
 }
 
 function toDateRange(month?: string) {
@@ -236,7 +240,7 @@ export async function deleteAttendance(id: string): Promise<void> {
 export async function registerAttendanceTime(
   employee: Employee,
   field: AttendanceField,
-  time = new Date().toTimeString().slice(0, 5),
+  time = normalizeTimeValue(new Date().toTimeString()),
 ): Promise<EmployeeAttendance> {
   const today = new Date().toISOString().split('T')[0];
   const existing = await getTodayAttendance(employee.id);
@@ -250,7 +254,7 @@ export async function registerAttendanceTime(
     afternoon_end: existing?.afternoon_end || null,
     hourly_rate: Number(employee.hourly_rate) || 0,
     notes: existing?.notes || null,
-    [field]: time,
+    [field]: normalizeTimeValue(time),
   });
 }
 
