@@ -18,9 +18,10 @@ import {
   UserCog,
   Shield,
   CalendarDays,
+  Bot,
 } from 'lucide-react';
 
-type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog' | 'personal' | 'agenda';
+type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog' | 'personal' | 'agenda' | 'ai-assistant';
 
 interface LayoutProps {
   currentPage: Page;
@@ -44,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { page: 'orders', label: 'Pedidos', icon: ClipboardList },
   { page: 'clients', label: 'Clientes', icon: Users },
   { page: 'agenda', label: 'Agenda', icon: CalendarDays, hiddenForPending: true },
+  { page: 'ai-assistant', label: 'Asistente IA', icon: Bot, hiddenForPending: true },
   { page: 'inventory', label: 'Inventario', icon: Package },
   { page: 'library', label: 'Biblioteca', icon: FolderOpen },
   { page: 'catalog', label: 'Catálogo Interno', icon: ImageIcon },
