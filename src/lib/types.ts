@@ -14,7 +14,8 @@ export type CatalogStatus = 'active' | 'hidden' | 'archived' | 'no_publish' | 'c
 export type FileType = 'pdf_a4' | 'pdf_plotter' | 'plt' | 'dxf' | 'cdr' | 'ai' | 'zip' | 'jpg' | 'png' | 'other';
 export type CatalogTag = 'muestra_fisica' | 'molde_aprobado' | 'para_redes' | 'no_publicar' | 'cliente_privado' | 'inspiracion' | 'produccion' | 'digital' | 'carton';
 export type EmployeeStatus = 'active' | 'inactive';
-export type PaymentType = 'adelanto' | 'pago_parcial' | 'pago_final';
+export type PaymentType = 'por_hora' | 'mensual';
+export type EmployeePaymentMethod = 'efectivo' | 'transferencia' | 'mercado_pago' | 'otro';
 
 export interface Client {
   id: string;
@@ -152,6 +153,8 @@ export interface Employee {
   position: string;
   start_date: string;
   monthly_salary: number;
+  hourly_rate: number;
+  payment_type: PaymentType;
   status: EmployeeStatus;
   created_at: string;
 }
@@ -159,18 +162,29 @@ export interface Employee {
 export interface EmployeeAttendance {
   id: string;
   employee_id: string;
-  date: string;
-  entry_time: string | null;
-  exit_time: string | null;
+  work_date: string;
+  date?: string;
+  morning_start: string | null;
+  morning_end: string | null;
+  afternoon_start: string | null;
+  afternoon_end: string | null;
+  morning_minutes: number;
+  afternoon_minutes: number;
+  total_minutes: number;
+  hourly_rate: number;
+  total_amount: number;
+  notes: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface EmployeePayment {
   id: string;
   employee_id: string;
-  date: string;
+  payment_date: string;
+  date?: string;
   amount: number;
-  payment_type: PaymentType;
+  payment_method: EmployeePaymentMethod;
   notes: string;
   created_at: string;
 }
@@ -329,10 +343,17 @@ export const EMPLOYEE_STATUS_CONFIG: Record<EmployeeStatus, { label: string; bgC
 };
 
 export const PAYMENT_TYPE_CONFIG: Record<PaymentType, { label: string; color: string }> = {
-  adelanto: { label: 'Adelanto', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-  pago_parcial: { label: 'Pago parcial', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-  pago_final: { label: 'Pago final', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
+  por_hora: { label: 'Por hora', color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' },
+  mensual: { label: 'Mensual', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+};
+
+export const PAYMENT_METHOD_CONFIG: Record<EmployeePaymentMethod, { label: string; color: string }> = {
+  efectivo: { label: 'Efectivo', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
+  transferencia: { label: 'Transferencia', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+  mercado_pago: { label: 'Mercado Pago', color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' },
+  otro: { label: 'Otro', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300' },
 };
 
 export const EMPLOYEE_STATUS_OPTIONS: EmployeeStatus[] = ['active', 'inactive'];
-export const PAYMENT_TYPE_OPTIONS: PaymentType[] = ['adelanto', 'pago_parcial', 'pago_final'];
+export const PAYMENT_TYPE_OPTIONS: PaymentType[] = ['por_hora', 'mensual'];
+export const PAYMENT_METHOD_OPTIONS: EmployeePaymentMethod[] = ['efectivo', 'transferencia', 'mercado_pago', 'otro'];
