@@ -240,12 +240,14 @@ export default function Personal() {
     if (!employeeForm.name.trim()) return;
     setSaving(true);
     try {
+      const isAnaEmployee = employeeForm.name.toUpperCase().includes('ANA');
       const payload = {
         ...employeeForm,
-        position: employeeForm.position || (employeeForm.name.toUpperCase().includes('ANA') ? 'ASISTENTE' : ''),
-        hourly_rate: Number(employeeForm.hourly_rate) || 0,
+        position: employeeForm.position || (isAnaEmployee ? 'ASISTENTE' : ''),
+        payment_type: isAnaEmployee ? 'por_hora' as PaymentType : employeeForm.payment_type,
+        hourly_rate: Number(employeeForm.hourly_rate) || (isAnaEmployee ? ANA_HOURLY_RATE : 0),
         monthly_salary: Number(employeeForm.monthly_salary) || 0,
-        monthly_goal: Number(employeeForm.monthly_goal) || 0,
+        monthly_goal: Number(employeeForm.monthly_goal) || (isAnaEmployee ? ANA_MONTHLY_GOAL : 0),
       };
       const saved = editingEmployee
         ? await updateEmployee(editingEmployee.id, payload)
