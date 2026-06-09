@@ -12,6 +12,7 @@ import { getWhatsAppLink } from '../lib/clients';
 import type { Client, ClientType, ClientStatus, Order } from '../lib/types';
 import { CLIENT_TYPE_CONFIG, CLIENT_STATUS_CONFIG, CLIENT_TYPE_OPTIONS, CLIENT_STATUS_OPTIONS, STATUS_CONFIG } from '../lib/types';
 import { Search, Plus, CreditCard as Edit3, Phone, MapPin, Star, MessageCircle, X, Save, Loader2, Building, Eye } from 'lucide-react';
+import ClientFilesSection from '../components/ClientFilesSection';
 
 interface ClientsProps {
   onNavigate: (page: string, orderId?: string, clientId?: string) => void;
@@ -19,6 +20,15 @@ interface ClientsProps {
 
 interface ClientWithStats extends Client {
   orderCount: number;
+  lastOrder: Order | null;
+}
+
+interface ClientStats {
+  totalOrders: number;
+  totalSpent: number;
+  totalPaid: number;
+  pendingBalance: number;
+  deliveredCount: number;
   lastOrder: Order | null;
 }
 
@@ -32,7 +42,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [showDetail, setShowDetail] = useState<ClientWithStats | null>(null);
   const [clientOrders, setClientOrders] = useState<Order[]>([]);
-  const [clientStats, setClientStats] = useState<any>(null);
+  const [clientStats, setClientStats] = useState<ClientStats | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const [form, setForm] = useState({
@@ -520,7 +530,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
       {/* Client Detail Modal */}
       {showDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="w-full max-w-2xl bg-crudo-50 dark:bg-slate-800 rounded-2xl shadow-xl border border-petrol-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-5xl bg-crudo-50 dark:bg-slate-800 rounded-2xl shadow-xl border border-petrol-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
             <div className="p-5 border-b border-petrol-200 dark:border-slate-700 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-petrol-800 dark:text-white">
@@ -596,6 +606,8 @@ export default function Clients({ onNavigate }: ClientsProps) {
                   </div>
                 </div>
               )}
+
+              <ClientFilesSection clientId={showDetail.id} />
 
               {/* Orders list */}
               <div>
