@@ -13,9 +13,10 @@ import MoldLibrary from './pages/MoldLibrary';
 import InternalCatalog from './pages/InternalCatalog';
 import Personal from './pages/Personal';
 import Agenda from './pages/Agenda';
+import AiAssistant from './pages/AiAssistant';
 import Login from './pages/Login';
 
-type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog' | 'personal' | 'agenda';
+type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog' | 'personal' | 'agenda' | 'ai-assistant';
 
 function AppContent() {
   const { user, profile, isAdmin, loading, signOut } = useAuth();
@@ -77,6 +78,8 @@ function AppContent() {
         return <Personal />;
       case 'agenda':
         return <Agenda />;
+      case 'ai-assistant':
+        return <AiAssistant />;
       default:
         return <Dashboard onNavigate={handleNavigate} />;
     }

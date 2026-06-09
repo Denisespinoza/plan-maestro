@@ -84,9 +84,15 @@ Para configurar CEO MODELTEX correctamente:
      * VITE_SUPABASE_ANON_KEY = [tu anon key de Supabase]
    - Hacé clic en "Save"
 
-3. Redesplegá el proyecto:
+3. Configurá el Asistente Operativo IA en Vercel (lado servidor):
+   - Agregá OPENAI_API_KEY = [tu clave privada de OpenAI]
+   - Opcional: AI_PROVIDER = openai
+   - Opcional: OPENAI_MODEL = gpt-4o-mini
+   - No uses claves de IA en código ni las llames directamente desde el navegador.
+
+4. Redesplegá el proyecto:
    - Deployments > Click en los 3 puntos del último deploy
    - "Redeploy"
 
-La aplicación se conectará automáticamente a Supabase.
+La aplicación se conectará automáticamente a Supabase y el chat usará /api/ai-chat para proteger la clave de IA.
 `.trim();
