@@ -3,6 +3,8 @@ export type Priority = 'normal' | 'urgent' | 'very_urgent';
 export type ClientType = 'fabricante' | 'emprendedor' | 'taller' | 'revendedor' | 'otro';
 export type ClientStatus = 'active' | 'pending' | 'inactive';
 
+export type ClientFileCategory = 'molde' | 'tizado' | 'pdf' | 'imagen_referencia' | 'ficha_tecnica' | 'diseno' | 'otro';
+
 // Inventory types
 export type ModelCategory = 'HOMBRE' | 'DAMA' | 'NIÑO' | 'NIÑA' | 'BEBES';
 export type LegacyCategory = 'hombre' | 'mujer' | 'niño' | 'niña' | 'bebé' | 'bebe' | 'bebés' | 'deportivo' | 'escolar' | 'trabajo' | 'accesorios' | 'otros';
@@ -31,6 +33,24 @@ export interface Client {
   status: ClientStatus;
   is_favorite: boolean;
   created_at: string;
+}
+
+
+export interface ClientFile {
+  id: string;
+  client_id: string;
+  related_order_id: string | null;
+  file_name: string;
+  original_file_name: string;
+  file_path: string;
+  file_type: string | null;
+  file_extension: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  category: ClientFileCategory | null;
+  notes: string | null;
+  uploaded_by: string | null;
+  uploaded_at: string;
 }
 
 export interface Order {
