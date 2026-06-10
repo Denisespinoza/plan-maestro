@@ -116,20 +116,56 @@ export async function getClientStats(clientId: string) {
   };
 }
 
-export async function getClientsWithStats() {
-  const clients = await getClients();
-  const result = [];
+const PAGE_SIZE = 20;
 
-  for (const client of clients) {
-    const orders = await getClientOrders(client.id);
-    result.push({
-      ...client,
-      orderCount: orders.length,
-      lastOrder: orders[0] || null,
-    });
+export async function getClientsWithStats(params?: {
+  page?: number;
+  search?: string;
+  filterType?: string;
+  filterStatus?: string;
+}): Promise<{ data: (Client & { orderCount: number; lastOrder: Order | null })[]; total: number }> {
+  const page = params?.page ?? 0;
+  const from = page * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  let query = supabase
+    .from('customers')
+    .select(`*, orders(id, status, price, paid_amount, remaining_balance, created_at)`, { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (params?.search?.trim()) {
+    const q = params.search.trim();
+    query = query.or(
+      `name.ilike.%${q}%,business_name.ilike.%${q}%,contact_name.ilike.%${q}%,phone.ilike.%${q}%,whatsapp.ilike.%${q}%,email.ilike.%${q}%,locality.ilike.%${q}%`
+    );
   }
 
-  return result;
+  if (params?.filterType) {
+    query = query.eq('client_type', params.filterType);
+  }
+
+  if (params?.filterStatus) {
+    query = query.eq('status', params.filterStatus);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  const mapped = (data ?? []).map((client: Client & { orders?: Order[] }) => {
+    const orders: Order[] = client.orders ?? [];
+    const sorted = [...orders].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    return {
+      ...client,
+      orders: undefined,
+      orderCount: orders.length,
+      lastOrder: sorted[0] ?? null,
+    };
+  });
+
+  return { data: mapped, total: count ?? 0 };
 }
 
 export async function toggleClientFavorite(clientId: string, isFavorite: boolean): Promise<void> {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import {
   getClientsWithStats,
@@ -37,10 +37,15 @@ export default function Clients({ onNavigate }: ClientsProps) {
   const { profile } = useAuth();
   const isAsistente = profile?.role === 'asistente';
   const [clients, setClients] = useState<ClientWithStats[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 20;
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterType, setFilterType] = useState<ClientType | ''>('');
   const [filterStatus, setFilterStatus] = useState<ClientStatus | ''>('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [showDetail, setShowDetail] = useState<ClientWithStats | null>(null);
@@ -64,14 +69,32 @@ export default function Clients({ onNavigate }: ClientsProps) {
   });
   const [saving, setSaving] = useState(false);
 
+  // Debounce: actualiza debouncedSearch 300ms después de que el usuario deje de escribir
   useEffect(() => {
-    loadClients();
-  }, []);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(0); // volver a página 1 al buscar
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [search]);
 
-  const loadClients = async () => {
+  // Recarga cuando cambia página, búsqueda o filtros
+  useEffect(() => {
+    loadClients(page);
+  }, [page, debouncedSearch, filterType, filterStatus]);
+
+  const loadClients = async (p: number) => {
+    setLoading(true);
     try {
-      const data = await getClientsWithStats();
-      setClients(data);
+      const { data, total: t } = await getClientsWithStats({
+        page: p,
+        search: debouncedSearch,
+        filterType,
+        filterStatus,
+      });
+      setClients(data as ClientWithStats[]);
+      setTotal(t);
     } catch (err) {
       console.error(err);
     } finally {
@@ -79,32 +102,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
     }
   };
 
-  const filteredClients = useMemo(() => {
-    let result = clients;
-    const q = search.toLowerCase();
-
-    if (search) {
-      result = result.filter(c =>
-        c.name?.toLowerCase().includes(q) ||
-        c.business_name?.toLowerCase().includes(q) ||
-        c.contact_name?.toLowerCase().includes(q) ||
-        c.phone?.includes(q) ||
-        c.whatsapp?.includes(q) ||
-        c.email?.toLowerCase().includes(q) ||
-        c.locality?.toLowerCase().includes(q)
-      );
-    }
-
-    if (filterType) {
-      result = result.filter(c => c.client_type === filterType);
-    }
-
-    if (filterStatus) {
-      result = result.filter(c => c.status === filterStatus);
-    }
-
-    return result;
-  }, [clients, search, filterType, filterStatus]);
+  // Los filtros y búsqueda se aplican en el backend — clients ya viene filtrado y paginado
 
   const openNewClient = () => {
     setEditingClient(null);
@@ -174,7 +172,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
         });
       }
       setShowModal(false);
-      loadClients();
+      loadClients(page);
     } catch (err) {
       console.error(err);
       alert('Error al guardar cliente');
@@ -187,7 +185,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
     try {
       await deleteClient(id);
       setDeleteConfirm(null);
-      loadClients();
+      loadClients(page);
     } catch (err) {
       console.error(err);
       alert('Error al eliminar cliente');
@@ -197,7 +195,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
   const handleToggleFavorite = async (client: Client) => {
     try {
       await toggleClientFavorite(client.id, !client.is_favorite);
-      loadClients();
+      loadClients(page);
     } catch (err) {
       console.error(err);
     }
@@ -207,7 +205,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
   // const _handleStatusChange = async (clientId: string, status: ClientStatus) => {
   //   try {
   //     await setClientStatus(clientId, status);
-  //     loadClients();
+  //     loadClients(page);
   //   } catch (err) {
   //     console.error(err);
   //   }
@@ -227,7 +225,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-petrol-800 dark:text-white">Clientes</h1>
-          <p className="text-sm text-petrol-600 dark:text-petrol-400 mt-1">{filteredClients.length} clientes registrados</p>
+          <p className="text-sm text-petrol-600 dark:text-petrol-400 mt-1">{total} clientes registrados</p>
         </div>
         <button
           onClick={openNewClient}
@@ -254,7 +252,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
         <div className="flex flex-wrap gap-2">
           <select
             value={filterType}
-            onChange={e => setFilterType(e.target.value as ClientType | '')}
+            onChange={e => { setFilterType(e.target.value as ClientType | ''); setPage(0); }}
             className="px-3 py-2 bg-white dark:bg-slate-700 border border-petrol-200 dark:border-slate-600 rounded-lg text-sm text-petrol-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
           >
             <option value="">Todos los tipos</option>
@@ -264,7 +262,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
           </select>
           <select
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value as ClientStatus | '')}
+            onChange={e => { setFilterStatus(e.target.value as ClientStatus | ''); setPage(0); }}
             className="px-3 py-2 bg-white dark:bg-slate-700 border border-petrol-200 dark:border-slate-600 rounded-lg text-sm text-petrol-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
           >
             <option value="">Todos los estados</option>
@@ -276,14 +274,14 @@ export default function Clients({ onNavigate }: ClientsProps) {
       </div>
 
       {/* Clients grid */}
-      {filteredClients.length === 0 ? (
+      {clients.length === 0 ? (
         <div className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-12 border border-petrol-200 dark:border-slate-700 text-center">
           <Building size={40} className="mx-auto text-petrol-300 mb-3" />
           <p className="text-petrol-500 dark:text-petrol-400 text-sm">No se encontraron clientes</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredClients.map(client => (
+          {clients.map(client => (
             <div
               key={client.id}
               className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-4 border border-petrol-200 dark:border-slate-700 hover:shadow-md transition-all duration-150"
@@ -367,6 +365,34 @@ export default function Clients({ onNavigate }: ClientsProps) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {total > PAGE_SIZE && (
+        <div className="flex items-center justify-between px-1">
+          <p className="text-xs text-petrol-500 dark:text-petrol-400">
+            Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} de {total}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-3 py-1.5 text-sm bg-white dark:bg-slate-700 border border-petrol-200 dark:border-slate-600 rounded-lg text-petrol-600 dark:text-petrol-300 hover:bg-petrol-50 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              ← Anterior
+            </button>
+            <span className="text-xs text-petrol-500 dark:text-petrol-400">
+              Pág. {page + 1} / {Math.ceil(total / PAGE_SIZE)}
+            </span>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={(page + 1) * PAGE_SIZE >= total}
+              className="px-3 py-1.5 text-sm bg-white dark:bg-slate-700 border border-petrol-200 dark:border-slate-600 rounded-lg text-petrol-600 dark:text-petrol-300 hover:bg-petrol-50 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Siguiente →
+            </button>
+          </div>
         </div>
       )}
 
