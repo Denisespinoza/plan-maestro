@@ -205,7 +205,10 @@ export async function upsertAttendance(input: AttendanceInput): Promise<Employee
     .select()
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[upsertAttendance] Supabase error:', error);
+    throw new Error(`${error.message} (código: ${error.code})`);
+  }
   return data!;
 }
 
@@ -283,7 +286,6 @@ export async function createPayment(payment: Partial<EmployeePayment>): Promise<
     .from('employee_payments')
     .insert({
       employee_id: payment.employee_id!,
-      date: paymentDate,
       payment_date: paymentDate,
       amount: payment.amount || 0,
       payment_method: payment.payment_method || 'efectivo',
@@ -292,7 +294,10 @@ export async function createPayment(payment: Partial<EmployeePayment>): Promise<
     .select()
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[createPayment] Supabase error:', error);
+    throw new Error(`${error.message} (código: ${error.code})`);
+  }
   return data!;
 }
 

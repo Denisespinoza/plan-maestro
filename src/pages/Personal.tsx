@@ -288,8 +288,9 @@ export default function Personal() {
       await refreshEmployeeDetail(selectedEmployee, selectedMonth);
       await loadData();
     } catch (err) {
-      console.error(err);
-      alert('Error al guardar asistencia');
+      const detail = err instanceof Error ? err.message : JSON.stringify(err);
+      console.error('[saveTodayAttendance]', err);
+      alert(`Error al guardar asistencia: ${detail}`);
     } finally {
       setSaving(false);
     }
@@ -347,8 +348,9 @@ export default function Personal() {
       await refreshEmployeeDetail(selectedEmployee, selectedMonth);
       await loadData();
     } catch (err) {
-      console.error(err);
-      alert('Error al guardar asistencia');
+      const detail = err instanceof Error ? err.message : JSON.stringify(err);
+      console.error('[handleSaveAttendance]', err);
+      alert(`Error al guardar asistencia: ${detail}`);
     } finally {
       setSaving(false);
     }
@@ -386,8 +388,9 @@ export default function Personal() {
       await refreshEmployeeDetail(selectedEmployee, selectedMonth);
       await loadData();
     } catch (err) {
-      console.error(err);
-      alert('Error al registrar pago');
+      const detail = err instanceof Error ? err.message : JSON.stringify(err);
+      console.error('[handleSavePayment]', err);
+      alert(`Error al registrar pago: ${detail}`);
     } finally {
       setSaving(false);
     }
