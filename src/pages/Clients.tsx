@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../lib/AuthContext';
 import {
   getClientsWithStats,
   createClient,
@@ -33,6 +34,8 @@ interface ClientStats {
 }
 
 export default function Clients({ onNavigate }: ClientsProps) {
+  const { profile } = useAuth();
+  const isAsistente = profile?.role === 'asistente';
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -660,7 +663,7 @@ export default function Clients({ onNavigate }: ClientsProps) {
       )}
 
       {/* Delete confirmation */}
-      {deleteConfirm && (
+      {deleteConfirm && !isAsistente && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="w-full max-w-sm bg-crudo-50 dark:bg-slate-800 rounded-xl shadow-xl border border-petrol-200 dark:border-slate-700 p-5">
             <h3 className="text-lg font-semibold text-petrol-800 dark:text-white mb-2">Eliminar cliente</h3>

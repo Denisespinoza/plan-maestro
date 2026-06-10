@@ -14,9 +14,10 @@ import InternalCatalog from './pages/InternalCatalog';
 import Personal from './pages/Personal';
 import Agenda from './pages/Agenda';
 import AiAssistant from './pages/AiAssistant';
+import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
 
-type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog' | 'personal' | 'agenda' | 'ai-assistant';
+type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog' | 'personal' | 'agenda' | 'ai-assistant' | 'users';
 
 function AppContent() {
   const { user, profile, isAdmin, loading, signOut } = useAuth();
@@ -75,11 +76,13 @@ function AppContent() {
       case 'catalog':
         return <InternalCatalog onNavigate={handleNavigate} />;
       case 'personal':
-        return <Personal />;
+        return <Personal userRole={profile?.role} />;
       case 'agenda':
         return <Agenda />;
       case 'ai-assistant':
         return <AiAssistant />;
+      case 'users':
+        return <UserManagement />;
       default:
         return <Dashboard onNavigate={handleNavigate} />;
     }

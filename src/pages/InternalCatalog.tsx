@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../lib/AuthContext';
 import {
   getCatalogItems,
   createCatalogItem,
@@ -25,6 +26,8 @@ interface InternalCatalogProps {
 }
 
 export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
+  const { profile } = useAuth();
+  const isAsistente = profile?.role === 'asistente';
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [models, setModels] = useState<InventoryModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -426,12 +429,12 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
                   >
                     <Edit3 size={14} />
                   </button>
-                  <button
+                  {!isAsistente && <button
                     onClick={() => setDeleteConfirm(item.id)}
                     className="px-3 py-2 bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 border border-petrol-200 dark:border-slate-600 rounded-lg text-xs"
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </button>}
                   {item.model_id && (
                     <button
                       onClick={() => onNavigate('library', undefined, undefined, item.model_id!)}

@@ -37,6 +37,7 @@ const TODAY = new Date().toISOString().split('T')[0];
 const CURRENT_MONTH = TODAY.slice(0, 7);
 const ANA_HOURLY_RATE = 5072.46;
 const ANA_MONTHLY_GOAL_LABEL = '$700.000';
+const DENIS_MONTHLY_GOAL_LABEL = '$2.000.000';
 
 type PersonalStats = {
   totalEmployees: number;
@@ -69,6 +70,10 @@ function isAna(employee: Employee) {
   return ['ANA', 'ANABEL'].some(name => employee.name?.toUpperCase().includes(name));
 }
 
+function isDenis(employee: Employee) {
+  return employee.name?.toUpperCase().includes('DENIS');
+}
+
 function getEmployeeRate(employee: Employee | null) {
   if (!employee) return 0;
   return Number(employee.hourly_rate) || (isAna(employee) ? ANA_HOURLY_RATE : 0);
@@ -76,6 +81,7 @@ function getEmployeeRate(employee: Employee | null) {
 
 function getEmployeeCompensationSummary(employee: Employee) {
   if (isAna(employee)) return `Objetivo mensual: ${ANA_MONTHLY_GOAL_LABEL}`;
+  if (isDenis(employee)) return `Objetivo mensual: ${DENIS_MONTHLY_GOAL_LABEL}`;
   if (employee.payment_type === 'por_hora') return 'Pago variable';
   return `Mensual: ${formatCurrency(Number(employee.monthly_salary))}`;
 }
@@ -89,7 +95,8 @@ function monthLabel(month: string) {
   return new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' }).format(new Date(year, monthNumber - 1, 1));
 }
 
-export default function Personal() {
+export default function Personal({ userRole }: { userRole?: string }) {
+  const isAsistente = String(userRole ?? '').trim().toLowerCase() === 'asistente';
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stats, setStats] = useState<PersonalStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -152,6 +159,9 @@ export default function Personal() {
       const normalizedEmployees = employeesData.map(employee => {
         if (isAna(employee) && (!employee.hourly_rate || employee.payment_type !== 'por_hora')) {
           return { ...employee, hourly_rate: Number(employee.hourly_rate) || ANA_HOURLY_RATE, payment_type: 'por_hora' as PaymentType, position: employee.position || 'ASISTENTE' };
+        }
+        if (isDenis(employee) && employee.payment_type !== 'por_hora') {
+          return { ...employee, payment_type: 'por_hora' as PaymentType, position: employee.position || 'CEO / PROPIETARIO' };
         }
         return employee;
       });
@@ -513,7 +523,7 @@ export default function Personal() {
                         {selectedEmployee.position || 'Sin rol'}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded ${PAYMENT_TYPE_CONFIG[selectedEmployee.payment_type || 'mensual'].color}`}>
-                        {isAna(selectedEmployee) ? 'Objetivo mensual' : PAYMENT_TYPE_CONFIG[selectedEmployee.payment_type || 'mensual'].label}
+                        {(isAna(selectedEmployee) || isDenis(selectedEmployee)) ? 'Objetivo mensual' : PAYMENT_TYPE_CONFIG[selectedEmployee.payment_type || 'mensual'].label}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${EMPLOYEE_STATUS_CONFIG[selectedEmployee.status as EmployeeStatus]?.bgClass} ${EMPLOYEE_STATUS_CONFIG[selectedEmployee.status as EmployeeStatus]?.textClass}`}>
                         {EMPLOYEE_STATUS_CONFIG[selectedEmployee.status as EmployeeStatus]?.label}
@@ -534,18 +544,19 @@ export default function Personal() {
                     <button onClick={() => openEditEmployee(selectedEmployee)} className="p-2 text-petrol-500 hover:bg-petrol-100 dark:hover:bg-slate-700 rounded-lg">
                       <Edit3 size={16} />
                     </button>
-                    <button onClick={() => setDeleteConfirm(selectedEmployee.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
+                    {!isAsistente && <button onClick={() => setDeleteConfirm(selectedEmployee.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
                       <Trash2 size={16} />
-                    </button>
+                    </button>}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4 pt-4 border-t border-petrol-100 dark:border-slate-700">
                   {isAna(selectedEmployee) && <SummaryCard label="Objetivo mensual" value={ANA_MONTHLY_GOAL_LABEL} />}
+                  {isDenis(selectedEmployee) && <SummaryCard label="Objetivo mensual" value={isAsistente ? '$0' : DENIS_MONTHLY_GOAL_LABEL} />}
                   <SummaryCard label={`Horas ${monthLabel(selectedMonth)}`} value={formatMinutes(monthlySummary.totalMinutes)} />
-                  <SummaryCard label="Sueldo generado" value={formatCurrency(generatedForEmployee)} />
-                  <SummaryCard label="Pagado este mes" value={formatCurrency(totalPaid)} valueClass="text-emerald-600" />
-                  <SummaryCard label="Pendiente" value={formatCurrency(pending)} valueClass="text-amber-600" />
+                  <SummaryCard label="Sueldo generado" value={isAsistente && isDenis(selectedEmployee) ? formatCurrency(0) : formatCurrency(generatedForEmployee)} />
+                  <SummaryCard label="Pagado este mes" value={isAsistente && isDenis(selectedEmployee) ? formatCurrency(0) : formatCurrency(totalPaid)} valueClass="text-emerald-600" />
+                  <SummaryCard label="Pendiente" value={isAsistente && isDenis(selectedEmployee) ? formatCurrency(0) : formatCurrency(pending)} valueClass="text-amber-600" />
                 </div>
               </div>
 
@@ -607,7 +618,7 @@ export default function Personal() {
                           <td className="px-3 py-2">
                             <div className="flex gap-1">
                               <button onClick={() => openAttendanceModal(item)} className="p-1.5 text-petrol-500 hover:bg-petrol-100 dark:hover:bg-slate-700 rounded"><Edit3 size={14} /></button>
-                              <button onClick={() => handleDeleteAttendance(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"><Trash2 size={14} /></button>
+                              {!isAsistente && <button onClick={() => handleDeleteAttendance(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"><Trash2 size={14} /></button>}
                             </div>
                           </td>
                         </tr>
@@ -617,7 +628,7 @@ export default function Personal() {
                 </div>
               </div>
 
-              <div className="bg-crudo-50 dark:bg-slate-800 rounded-xl border border-petrol-200 dark:border-slate-700 overflow-hidden">
+              {!(isAsistente && isDenis(selectedEmployee)) && <div className="bg-crudo-50 dark:bg-slate-800 rounded-xl border border-petrol-200 dark:border-slate-700 overflow-hidden">
                 <div className="px-4 py-3 bg-petrol-100 dark:bg-slate-700/50 border-b border-petrol-200 dark:border-slate-700 flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-petrol-700 dark:text-petrol-300 flex items-center gap-2">
                     <DollarSign size={16} /> Pagos del mes
@@ -643,13 +654,13 @@ export default function Personal() {
                           {payment.notes && ` - ${payment.notes}`}
                         </p>
                       </div>
-                      <button onClick={() => handleDeletePayment(payment.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded">
+                      {!isAsistente && <button onClick={() => handleDeletePayment(payment.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded">
                         <Trash2 size={14} />
-                      </button>
+                      </button>}
                     </div>
                   ))}
                 </div>
-              </div>
+              </div>}
             </>
           )}
         </div>

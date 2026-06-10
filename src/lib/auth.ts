@@ -85,3 +85,20 @@ export async function isUserAdmin(userId: string): Promise<boolean> {
 export function onAuthStateChange(callback: (event: string, session: Session | null) => void) {
   return supabase.auth.onAuthStateChange(callback);
 }
+
+export async function getAllUserProfiles(): Promise<UserProfile[]> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('id, email, full_name, role')
+    .order('email');
+  if (error) throw error;
+  return (data ?? []) as UserProfile[];
+}
+
+export async function updateUserRole(userId: string, role: string): Promise<void> {
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ role })
+    .eq('id', userId);
+  if (error) throw error;
+}

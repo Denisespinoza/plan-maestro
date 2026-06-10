@@ -131,7 +131,7 @@ function getCalendarDays(referenceDate: Date, viewMode: AgendaViewMode) {
 
 function isAllowedRole(role: unknown) {
   const normalized = String(role ?? '').trim().toLowerCase();
-  return ['admin', 'administrator', 'administrador', 'empleado', 'staff'].includes(normalized);
+  return ['admin', 'administrator', 'administrador', 'empleado', 'staff', 'asistente'].includes(normalized);
 }
 
 function isAdminRole(role: unknown) {

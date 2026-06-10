@@ -21,7 +21,7 @@ import {
   Bot,
 } from 'lucide-react';
 
-type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog' | 'personal' | 'agenda' | 'ai-assistant';
+type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog' | 'personal' | 'agenda' | 'ai-assistant' | 'users';
 
 interface LayoutProps {
   currentPage: Page;
@@ -38,6 +38,7 @@ interface NavItem {
   icon: typeof LayoutDashboard;
   adminOnly?: boolean;
   hiddenForPending?: boolean;
+  hiddenForAsistente?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -50,7 +51,8 @@ const NAV_ITEMS: NavItem[] = [
   { page: 'library', label: 'Biblioteca', icon: FolderOpen },
   { page: 'catalog', label: 'Catálogo Interno', icon: ImageIcon },
   { page: 'personal', label: 'Personal', icon: UserCog },
-  { page: 'finance', label: 'Finanzas', icon: DollarSign },
+  { page: 'finance', label: 'Finanzas', icon: DollarSign, hiddenForAsistente: true },
+  { page: 'users', label: 'Usuarios', icon: Shield, adminOnly: true },
 ];
 
 export default function Layout({ currentPage, onNavigate, children, isAdmin = false, userRole, onLogout }: LayoutProps) {
@@ -63,7 +65,12 @@ export default function Layout({ currentPage, onNavigate, children, isAdmin = fa
   };
 
   const normalizedRole = String(userRole ?? '').trim().toLowerCase();
-  const visibleNavItems = NAV_ITEMS.filter(item => !item.hiddenForPending || normalizedRole !== 'pendiente');
+  const visibleNavItems = NAV_ITEMS.filter(item => {
+    if (item.adminOnly && !isAdmin) return false;
+    if (item.hiddenForPending && normalizedRole === 'pendiente') return false;
+    if (item.hiddenForAsistente && normalizedRole === 'asistente') return false;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 transition-colors duration-200">

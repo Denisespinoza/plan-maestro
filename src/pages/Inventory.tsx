@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../lib/AuthContext';
 import {
   getModels,
   createModel,
@@ -23,6 +24,8 @@ interface InventoryProps {
 }
 
 export default function Inventory({ onNavigate }: InventoryProps) {
+  const { profile } = useAuth();
+  const isAsistente = profile?.role === 'asistente';
   const [models, setModels] = useState<InventoryModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -396,13 +399,13 @@ export default function Inventory({ onNavigate }: InventoryProps) {
                         >
                           <Edit3 size={16} />
                         </button>
-                        <button
+                        {!isAsistente && <button
                           onClick={() => setDeleteConfirm(model.id)}
                           className="p-1.5 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                           title="Eliminar"
                         >
                           <Trash2 size={16} />
-                        </button>
+                        </button>}
                         <button
                           onClick={() => onNavigate('library', undefined, undefined, model.id)}
                           className="p-1.5 rounded text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../lib/AuthContext';
 import {
   getModelFiles,
   createMoldFile,
@@ -31,6 +32,8 @@ interface MoldLibraryProps {
 }
 
 export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
+  const { profile } = useAuth();
+  const isAsistente = profile?.role === 'asistente';
   const [models, setModels] = useState<InventoryModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<InventoryModel | null>(null);
   const [files, setFiles] = useState<MoldFile[]>([]);
@@ -410,13 +413,13 @@ export default function MoldLibrary({ modelId, onNavigate }: MoldLibraryProps) {
                         >
                           <Save size={16} />
                         </button>
-                        <button
+                        {!isAsistente && <button
                           onClick={() => setDeleteConfirm(file.id)}
                           className="p-2 text-petrol-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
                           title="Eliminar"
                         >
                           <Trash2 size={16} />
-                        </button>
+                        </button>}
                       </div>
                     </div>
                   ))}
