@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 
 export interface SearchResult {
   id: string;
-  category: 'client' | 'order' | 'inventory';
+  category: 'client' | 'order' | 'inventory' | 'catalog';
   title: string;
   subtitle: string;
   page: string;
@@ -14,6 +14,7 @@ export interface SearchResults {
   clients: SearchResult[];
   orders: SearchResult[];
   inventory: SearchResult[];
+  catalog: SearchResult[];
   total: number;
 }
 
@@ -35,7 +36,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
   const q = query.trim();
   if (!q || q.length < 2) return { clients: [], orders: [], inventory: [], total: 0 };
 
-  const [clientsRes, ordersRes, inventoryRes] = await Promise.all([
+  const [clientsRes, ordersRes, inventoryRes, catalogRes] = await Promise.all([
     supabase
       .from('customers')
       .select('id, business_name, name, contact_name, phone, locality')
@@ -53,6 +54,12 @@ export async function globalSearch(query: string): Promise<SearchResults> {
       .select('id, code, name, category')
       .or(`code.ilike.%${q}%,name.ilike.%${q}%,category.ilike.%${q}%`)
       .eq('status', 'active')
+      .limit(5),
+
+    supabase
+      .from('internal_catalog')
+      .select('id, code, name, category, season')
+      .or(`code.ilike.%${q}%,name.ilike.%${q}%,category.ilike.%${q}%,season.ilike.%${q}%`)
       .limit(5),
   ]);
 
@@ -89,10 +96,19 @@ export async function globalSearch(query: string): Promise<SearchResults> {
     modelId: m.id,
   }));
 
+  const catalog: SearchResult[] = (catalogRes.data ?? []).map(c => ({
+    id: c.id,
+    category: 'catalog',
+    title: `${c.code} — ${c.name}`,
+    subtitle: [c.category, c.season].filter(Boolean).join(' · '),
+    page: 'catalog',
+  }));
+
   return {
     clients,
     orders,
     inventory,
-    total: clients.length + orders.length + inventory.length,
+    catalog,
+    total: clients.length + orders.length + inventory.length + catalog.length,
   };
 }

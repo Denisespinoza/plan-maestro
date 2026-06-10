@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, Building2, Loader2, Package, Search, ClipboardList, X } from 'lucide-react';
+import { Bot, Building2, Image, Loader2, Package, Search, ClipboardList, X } from 'lucide-react';
 import { globalSearch, looksLikeAiQuery, SearchResult, SearchResults } from '../lib/globalSearch';
 
 type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' |
@@ -12,9 +12,10 @@ interface GlobalSearchProps {
 }
 
 const CATEGORY_CONFIG = {
-  client:    { label: 'Clientes',   icon: Building2,    color: 'text-violet-400' },
-  order:     { label: 'Pedidos',    icon: ClipboardList, color: 'text-teal-400'  },
-  inventory: { label: 'Inventario', icon: Package,       color: 'text-amber-400' },
+  client:    { label: 'Clientes',          icon: Building2,    color: 'text-violet-400' },
+  order:     { label: 'Pedidos',           icon: ClipboardList, color: 'text-teal-400'  },
+  inventory: { label: 'Inventario',        icon: Package,       color: 'text-amber-400' },
+  catalog:   { label: 'Catálogo Interno',  icon: Image,         color: 'text-pink-400'  },
 } as const;
 
 export default function GlobalSearch({ onNavigate, onOpenAi }: GlobalSearchProps) {
@@ -76,6 +77,7 @@ export default function GlobalSearch({ onNavigate, onOpenAi }: GlobalSearchProps
     ...(results?.clients ?? []),
     ...(results?.orders ?? []),
     ...(results?.inventory ?? []),
+    ...(results?.catalog ?? []),
     ...(query.trim().length > 1 ? ['ai' as const] : []),
   ];
 
@@ -167,8 +169,8 @@ export default function GlobalSearch({ onNavigate, onOpenAi }: GlobalSearchProps
             )}
 
             {/* Categorized results */}
-            {(['client', 'order', 'inventory'] as const).map(cat => {
-              const items = results?.[cat === 'client' ? 'clients' : cat === 'order' ? 'orders' : 'inventory'] ?? [];
+            {(['client', 'order', 'inventory', 'catalog'] as const).map(cat => {
+              const items = results?.[cat === 'client' ? 'clients' : cat === 'order' ? 'orders' : cat === 'inventory' ? 'inventory' : 'catalog'] ?? [];
               if (!items.length) return null;
               const { label, icon: Icon, color } = CATEGORY_CONFIG[cat];
               return (
