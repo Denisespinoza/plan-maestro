@@ -40,7 +40,7 @@ const QUICK_PROMPTS: QuickPrompt[] = [
 
 const WELCOME_MESSAGE: AiChatMessage = {
   role: 'assistant',
-  content: 'Hola, soy el Asistente Operativo IA de CEO Modeltex. Puedo ayudarte a redactar mensajes, armar descripciones comerciales, ordenar pedidos, calcular precios simples y preparar resúmenes con datos de solo lectura del sistema.',
+  content: 'Hola, soy Kairos, el Asistente Operativo de CEO Modeltex. Puedo ayudarte a redactar mensajes, armar descripciones comerciales, ordenar pedidos, calcular precios simples y preparar resúmenes con datos de solo lectura del sistema.',
 };
 
 function looksLikeConfirmationRequest(content: string) {
