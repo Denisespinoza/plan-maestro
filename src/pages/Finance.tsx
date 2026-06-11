@@ -1,6 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Client, Employee, FinanceMovement, FinanceMovementStatus, FinanceMovementType, Order } from '../lib/types';
+import AccountsReceivableModule from './AccountsReceivable';
+import AccountsPayableModule from './AccountsPayable';
+import { getReceivables, getPayables, computeReceivableSummary, computePayableSummary } from '../lib/debts';
 import {
   AlertCircle,
   Banknote,
@@ -21,6 +24,7 @@ import {
   X,
 } from 'lucide-react';
 
+type ActiveTab = 'movements' | 'receivable' | 'payable';
 type DateFilter = 'day' | 'week' | 'month' | 'custom' | 'all';
 type MovementSource = 'manual' | 'order';
 
@@ -255,11 +259,14 @@ const getDefaultDateRange = (filter: DateFilter) => {
 };
 
 export default function Finance() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>('movements');
   const [movements, setMovements] = useState<FinanceMovement[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [receivablePending, setReceivablePending] = useState(0);
+  const [payablePending, setPayablePending] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -275,7 +282,16 @@ export default function Finance() {
 
   useEffect(() => {
     loadFinanceData();
+    loadDebtSummary();
   }, []);
+
+  const loadDebtSummary = async () => {
+    try {
+      const [rec, pay] = await Promise.all([getReceivables(), getPayables()]);
+      setReceivablePending(computeReceivableSummary(rec).pending);
+      setPayablePending(computePayableSummary(pay).pending);
+    } catch (e) { console.error(e); }
+  };
 
   const loadFinanceData = async () => {
     setLoading(true);
@@ -694,16 +710,30 @@ export default function Finance() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => startCreate('income')}
+            onClick={() => { setActiveTab('movements'); startCreate('income'); }}
             className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
           >
             <Plus size={14} /> Nuevo ingreso
           </button>
           <button
-            onClick={() => startCreate('expense')}
+            onClick={() => { setActiveTab('movements'); startCreate('expense'); }}
             className="px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
           >
             <Plus size={14} /> Nuevo egreso
+          </button>
+          <button
+            onClick={() => setActiveTab('receivable')}
+            className="px-3 py-2 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+            style={{ backgroundColor: activeTab === 'receivable' ? '#96700A' : '#B8860B' }}
+          >
+            <Coins size={14} /> Cuentas a Cobrar
+          </button>
+          <button
+            onClick={() => setActiveTab('payable')}
+            className="px-3 py-2 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+            style={{ backgroundColor: activeTab === 'payable' ? '#6B1414' : '#8B1A1A' }}
+          >
+            <CreditCard size={14} /> Cuentas a Pagar
           </button>
           <button
             onClick={exportMovementsCSV}
@@ -768,17 +798,61 @@ export default function Finance() {
             />
           </div>
         )}
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
           <SummaryCard label="Total ingresos" value={currency(summary.totalIncome)} icon={TrendingUp} color="bg-emerald-600" valueClass="text-emerald-600 dark:text-emerald-400" />
           <SummaryCard label="Total egresos" value={currency(summary.totalExpenses)} icon={TrendingDown} color="bg-rose-600" valueClass="text-rose-600 dark:text-rose-400" />
           <SummaryCard label="Ganancia neta" value={currency(summary.netProfit)} icon={DollarSign} color="bg-violet-500" valueClass={summary.netProfit >= 0 ? 'text-violet-600 dark:text-violet-400' : 'text-rose-600 dark:text-rose-400'} />
           <SummaryCard label="Caja actual" value={currency(summary.currentCash)} icon={Wallet} color="bg-petrol-600" valueClass="text-petrol-800 dark:text-white" />
           <SummaryCard label="Pendiente de cobro" value={currency(summary.pendingCollection)} icon={AlertCircle} color="bg-amber-600" valueClass="text-amber-600 dark:text-amber-400" />
           <SummaryCard label="Pendiente de pago" value={currency(summary.pendingPayment)} icon={CreditCard} color="bg-orange-600" valueClass="text-orange-600 dark:text-orange-400" />
+          <div
+            className="bg-white dark:bg-slate-700 rounded-xl p-4 border-2 cursor-pointer transition-all hover:opacity-90"
+            style={{ borderColor: '#B8860B' }}
+            onClick={() => setActiveTab('receivable')}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg" style={{ backgroundColor: '#B8860B' }}><Coins size={18} className="text-white" /></div>
+              <div className="min-w-0">
+                <p className="text-xs text-petrol-500 dark:text-petrol-400">A cobrar</p>
+                <p className="text-lg font-bold truncate" style={{ color: '#B8860B' }}>{currency(receivablePending)}</p>
+              </div>
+            </div>
+          </div>
+          <div
+            className="bg-white dark:bg-slate-700 rounded-xl p-4 border-2 cursor-pointer transition-all hover:opacity-90"
+            style={{ borderColor: '#8B1A1A' }}
+            onClick={() => setActiveTab('payable')}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg" style={{ backgroundColor: '#8B1A1A' }}><CreditCard size={18} className="text-white" /></div>
+              <div className="min-w-0">
+                <p className="text-xs text-petrol-500 dark:text-petrol-400">A pagar</p>
+                <p className="text-lg font-bold truncate text-red-700 dark:text-red-400">{currency(payablePending)}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      {/* Debt modules */}
+      {activeTab === 'receivable' && (
+        <section className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-5 border-2 border-petrol-200 dark:border-slate-700/50" style={{ borderColor: '#B8860B' }}>
+          <button onClick={() => setActiveTab('movements')} className="text-xs text-petrol-400 hover:text-crudo-200 mb-4 flex items-center gap-1">
+            ← Volver a movimientos
+          </button>
+          <AccountsReceivableModule />
+        </section>
+      )}
+      {activeTab === 'payable' && (
+        <section className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-5 border-2 border-petrol-200 dark:border-slate-700/50" style={{ borderColor: '#8B1A1A' }}>
+          <button onClick={() => setActiveTab('movements')} className="text-xs text-petrol-400 hover:text-crudo-200 mb-4 flex items-center gap-1">
+            ← Volver a movimientos
+          </button>
+          <AccountsPayableModule />
+        </section>
+      )}
+
+      {activeTab === 'movements' && <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <section className="xl:col-span-2 bg-crudo-50 dark:bg-slate-800 rounded-xl p-5 border border-petrol-200 dark:border-slate-700/50 space-y-4">
           <h2 className="text-sm font-semibold text-petrol-700 dark:text-petrol-300 uppercase tracking-wide flex items-center gap-2">
             <Wallet size={16} /> Caja
@@ -822,9 +896,9 @@ export default function Finance() {
             {filteredMovements.length === 0 && <p className="text-xs text-petrol-500 dark:text-petrol-400">No hay movimientos para los filtros actuales.</p>}
           </div>
         </section>
-      </div>
+      </div>}
 
-      {formOpen && (
+      {activeTab === 'movements' && formOpen && (
         <section className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-5 border border-violet-300 dark:border-violet-500/40 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-petrol-700 dark:text-petrol-300 uppercase tracking-wide">
@@ -911,7 +985,7 @@ export default function Finance() {
         </section>
       )}
 
-      <section className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-5 border border-petrol-200 dark:border-slate-700/50 space-y-4">
+      {activeTab === 'movements' && <section className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-5 border border-petrol-200 dark:border-slate-700/50 space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <h2 className="text-sm font-semibold text-petrol-700 dark:text-petrol-300 uppercase tracking-wide flex items-center gap-2">
             <Filter size={16} /> Tabla de movimientos
@@ -1004,7 +1078,7 @@ export default function Finance() {
           </table>
           {filteredMovements.length === 0 && <p className="py-8 text-center text-sm text-petrol-500 dark:text-petrol-400">No hay movimientos para mostrar.</p>}
         </div>
-      </section>
+      </section>}
     </div>
   );
 }

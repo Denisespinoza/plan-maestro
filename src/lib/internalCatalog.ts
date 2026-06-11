@@ -132,12 +132,64 @@ export async function filterCatalogItems(filters: {
   return result;
 }
 
-// Upload catalog image
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB
+const TARGET_SIZE_BYTES = 500 * 1024;     // 500KB
+const MAX_DIMENSION = 1920;
+
+async function compressImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+
+      // Try quality levels until under TARGET_SIZE_BYTES
+      const tryCompress = (quality: number) => {
+        canvas.toBlob(
+          blob => {
+            if (!blob) { reject(new Error('Error al comprimir imagen')); return; }
+            if (blob.size <= TARGET_SIZE_BYTES || quality <= 0.3) {
+              resolve(blob);
+            } else {
+              tryCompress(Math.round((quality - 0.1) * 10) / 10);
+            }
+          },
+          'image/jpeg',
+          quality,
+        );
+      };
+      tryCompress(0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo leer la imagen')); };
+    img.src = url;
+  });
+}
+
+// Upload catalog image — compresses to ≤500KB before uploading
 export async function uploadCatalogImage(file: File, itemId: string): Promise<string> {
-  const path = `catalog/${itemId}/${Date.now()}_${file.name}`;
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error(`El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)}MB. El máximo permitido es 5MB.`);
+  }
+
+  const compressed = await compressImage(file);
+  const ext = 'jpg';
+  const path = `catalog/${itemId}/${Date.now()}.${ext}`;
+
   const { error } = await supabase.storage
     .from('catalog-images')
-    .upload(path, file, { upsert: true });
+    .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' });
 
   if (error) throw error;
 

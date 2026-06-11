@@ -19,7 +19,7 @@ import {
   CATALOG_TAG_CONFIG,
   CATALOG_TAG_OPTIONS,
 } from '../lib/types';
-import { Search, Plus, CreditCard as Edit3, Trash2, Filter, X, Save, Loader2, Upload, Image as ImageIcon, ZoomIn, ExternalLink } from 'lucide-react';
+import { Search, Plus, CreditCard as Edit3, Trash2, Filter, X, Save, Loader2, Upload, Image as ImageIcon, ZoomIn, ExternalLink, AlertCircle } from 'lucide-react';
 
 interface InternalCatalogProps {
   onNavigate: (page: string, orderId?: string, clientId?: string, modelId?: string) => void;
@@ -56,6 +56,7 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
     model_id: '',
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState<string>('');
   const photoInputRef = { current: null as HTMLInputElement | null };
 
   const [showViewer, setShowViewer] = useState(false);
@@ -119,6 +120,7 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
       model_id: '',
     });
     setPhotoFile(null);
+    setPhotoError('');
     setShowModal(true);
   };
 
@@ -136,6 +138,7 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
       model_id: item.model_id || '',
     });
     setPhotoFile(null);
+    setPhotoError('');
     setShowModal(true);
   };
 
@@ -143,36 +146,43 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      let photoUrl = editingItem?.photo_url || '';
-
-      if (photoFile) {
-        try {
-          photoUrl = await uploadCatalogImage(photoFile, editingItem?.id || `temp-${Date.now()}`);
-        } catch (uploadErr) {
-          console.error('Error uploading photo:', uploadErr);
-          alert('Error al subir la foto. Intentá de nuevo.');
-          setSaving(false);
-          return;
-        }
-      }
-
       if (editingItem) {
+        // Editing: upload photo first (ID already exists), then update
+        let photoUrl = editingItem.photo_url || '';
+        if (photoFile) {
+          try {
+            photoUrl = await uploadCatalogImage(photoFile, editingItem.id);
+          } catch (uploadErr: any) {
+            alert(uploadErr.message || 'Error al subir la foto. Intentá de nuevo.');
+            setSaving(false);
+            return;
+          }
+        }
         await updateCatalogItem(editingItem.id, {
           ...form,
           model_id: form.model_id || null,
           photo_url: photoUrl,
         });
       } else {
-        await createCatalogItem({
+        // New item: create first to get the real ID, then upload photo
+        const created = await createCatalogItem({
           ...form,
           model_id: form.model_id || null,
-          photo_url: photoUrl,
+          photo_url: '',
         });
+        if (photoFile) {
+          try {
+            const photoUrl = await uploadCatalogImage(photoFile, created.id);
+            await updateCatalogItem(created.id, { photo_url: photoUrl });
+          } catch (uploadErr: any) {
+            alert(uploadErr.message || 'El ítem se creó pero la foto no se pudo subir. Podés editarlo para agregar la foto.');
+          }
+        }
       }
 
-      // Close modal first, then reload data
       setShowModal(false);
       setPhotoFile(null);
+      setPhotoError('');
       await loadData();
     } catch (err) {
       console.error(err);
@@ -590,7 +600,17 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={e => setPhotoFile(e.target.files?.[0] || null)}
+                  onChange={e => {
+                  const f = e.target.files?.[0] || null;
+                  if (f && f.size > 5 * 1024 * 1024) {
+                    setPhotoError(`El archivo pesa ${(f.size / 1024 / 1024).toFixed(1)}MB. El máximo permitido es 5MB.`);
+                    setPhotoFile(null);
+                    e.target.value = '';
+                  } else {
+                    setPhotoError('');
+                    setPhotoFile(f);
+                  }
+                }}
                 />
                 <button
                   type="button"
@@ -598,8 +618,16 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
                   className="w-full px-3 py-4 border-2 border-dashed border-petrol-300 dark:border-slate-600 rounded-lg text-sm text-petrol-500 hover:border-violet-500 flex items-center justify-center gap-2"
                 >
                   <Upload size={16} />
-                  {photoFile ? photoFile.name : 'Subir foto'}
+                  {photoFile ? `${photoFile.name} (${(photoFile.size/1024).toFixed(0)}KB)` : 'Subir foto'}
                 </button>
+                {photoError && (
+                  <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle size={12} /> {photoError}
+                  </p>
+                )}
+                {!photoError && photoFile && (
+                  <p className="mt-1 text-xs text-petrol-400">Se comprimirá automáticamente a ≤500KB</p>
+                )}
                 {editingItem?.photo_url && !photoFile && (
                   <img src={editingItem.photo_url} alt="Actual" className="mt-2 h-24 w-full object-contain rounded-lg border border-petrol-200" />
                 )}
