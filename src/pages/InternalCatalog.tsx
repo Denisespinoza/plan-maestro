@@ -19,7 +19,7 @@ import {
   CATALOG_TAG_CONFIG,
   CATALOG_TAG_OPTIONS,
 } from '../lib/types';
-import { Search, Plus, CreditCard as Edit3, Trash2, Filter, X, Save, Loader2, Upload, Image as ImageIcon, ZoomIn, ExternalLink, AlertCircle } from 'lucide-react';
+import { Search, Plus, CreditCard as Edit3, Trash2, Filter, X, Save, Loader2, Upload, Image as ImageIcon, ZoomIn, ExternalLink, AlertCircle, Cloud, CheckCircle2 } from 'lucide-react';
 
 interface InternalCatalogProps {
   onNavigate: (page: string, orderId?: string, clientId?: string, modelId?: string) => void;
@@ -62,6 +62,31 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
   const [showViewer, setShowViewer] = useState(false);
   const [viewerItem, setViewerItem] = useState<CatalogItem | null>(null);
   const [zoom, setZoom] = useState(1);
+
+  // Migración a R2
+  const [migrating, setMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<{
+    total: number; migrated: number; skipped: number; failed: number;
+  } | null>(null);
+  const [showMigrateModal, setShowMigrateModal] = useState(false);
+
+  const handleMigrateToR2 = async () => {
+    if (!confirm('¿Migrar todas las fotos del catálogo de Supabase a Cloudflare R2? Esto puede tardar unos minutos.')) return;
+    setMigrating(true);
+    setMigrateResult(null);
+    try {
+      const res = await fetch('/api/r2-migrate', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error en migración');
+      setMigrateResult(data);
+      setShowMigrateModal(true);
+      await loadData(); // Refrescar con las nuevas URLs
+    } catch (e: any) {
+      alert('Error al migrar: ' + (e.message || 'Error desconocido'));
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -234,9 +259,22 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
           <h1 className="text-2xl font-bold text-crudo-100">Catálogo Interno</h1>
           <p className="text-sm text-crudo-400 mt-1">{filteredItems.length} imágenes privadas</p>
         </div>
-        <button onClick={openNewItem} className="px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
-          <Plus size={18} /> Nueva Imagen
-        </button>
+        <div className="flex gap-2">
+          {!isAsistente && (
+            <button
+              onClick={handleMigrateToR2}
+              disabled={migrating}
+              className="px-3 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white rounded-lg text-sm font-semibold flex items-center gap-2"
+              title="Migrar fotos a Cloudflare R2"
+            >
+              {migrating ? <Loader2 size={15} className="animate-spin" /> : <Cloud size={15} />}
+              {migrating ? 'Migrando...' : 'Migrar a R2'}
+            </button>
+          )}
+          <button onClick={openNewItem} className="px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
+            <Plus size={18} /> Nueva Imagen
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -708,6 +746,47 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
                 </span>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Migrate to R2 result modal */}
+      {showMigrateModal && migrateResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="w-full max-w-sm bg-slate-800 rounded-xl shadow-2xl border border-slate-700 p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <CheckCircle2 size={24} className="text-emerald-400" />
+              <h3 className="font-semibold text-crudo-100 text-lg">Migración completada</h3>
+            </div>
+            <div className="space-y-2 mb-5">
+              <div className="flex justify-between text-sm">
+                <span className="text-petrol-400">Total de fotos</span>
+                <span className="text-crudo-100 font-semibold">{migrateResult.total}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-petrol-400">Migradas a R2</span>
+                <span className="text-emerald-400 font-semibold">{migrateResult.migrated}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-petrol-400">Ya estaban en R2</span>
+                <span className="text-sky-400 font-semibold">{migrateResult.skipped}</span>
+              </div>
+              {migrateResult.failed > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-petrol-400">Fallidas</span>
+                  <span className="text-red-400 font-semibold">{migrateResult.failed}</span>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-petrol-400 mb-4">
+              Las fotos migradas ahora se sirven desde Cloudflare R2 — más rápido y sin límite de Supabase.
+            </p>
+            <button
+              onClick={() => setShowMigrateModal(false)}
+              className="w-full px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-semibold"
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}
