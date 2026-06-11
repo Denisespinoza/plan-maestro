@@ -649,7 +649,8 @@ export default function KanbanBoard({ events, customers, users, userId, isAdmin,
       </div>
 
       {/* Kanban columns */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-3">
+      <div className="overflow-x-auto pb-2">
+      <div className="grid grid-cols-6 gap-2 min-w-[900px]">
         {COLUMNS.map(col => {
           const colEvents = eventsByColumn[col.id] || [];
           const isDragTarget = dragOver === col.id;
@@ -710,6 +711,7 @@ export default function KanbanBoard({ events, customers, users, userId, isAdmin,
             </div>
           );
         })}
+      </div>
       </div>
 
       {/* Modals */}
