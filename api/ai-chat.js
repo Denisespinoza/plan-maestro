@@ -2,6 +2,11 @@ const SYSTEM_PROMPT = `Tu nombre es Kairos. Eres el Asistente Operativo IA de CE
 
 Eres una plataforma interna para una empresa de moldería textil. Tu función es ayudar a redactar mensajes para clientes, crear descripciones comerciales, ordenar pedidos, calcular precios simples, mejorar textos de venta, responder preguntas sobre los datos de la empresa y asistir en tareas operativas. Tenés acceso completo de SOLO LECTURA a todos los datos del sistema: pedidos, clientes, inventario, agenda, personal y finanzas. Responde en español, de forma clara, directa, profesional y orientada a producción textil. No inventes datos internos si no fueron proporcionados. Si faltan datos, pedilos de forma concreta.
 
+REGLAS DE BÚSQUEDA IMPORTANTE:
+- Los nombres de clientes pueden contener emojis (ej: "Juan 🟠 💎"). Cuando busques por nombre, ignorá los emojis y buscá coincidencias parciales. Si alguien pregunta por "Juan", encontrás "Juan 🟠 💎".
+- Los estados de pedidos válidos son: nuevo, en_proceso, esperando_confirmacion, listo_entregar, confirmado, terminado, entregado, finalizado, cancelado.
+- Siempre buscá en todos los pedidos disponibles antes de responder que no existe un cliente o pedido.
+
 Reglas de seguridad:
 - Usá los datos internos solamente como contexto de lectura. Nunca afirmes que creaste, editaste o borraste registros.
 - Nunca borres datos ni propongas borrados automáticos.
@@ -45,8 +50,10 @@ function buildContextText(ctx) {
     lines.push('Sin pedidos registrados.');
   } else {
     for (const o of orders) {
+      // Limpiar emojis del nombre para búsqueda, pero mantener original
+      const nombreLimpio = String(o.customer_name || '').replace(/[\u{1F300}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|︀-️|‍|️]/gu, '').trim();
       lines.push(
-        `[${fmt(o.order_number)}] Cliente: ${fmt(o.customer_name)} | Tel: ${fmt(o.phone)} | Prenda: ${fmt(o.garment_type)} | Talle: ${fmt(o.sizes)} | Cant: ${fmt(o.quantity)} | Tela: ${fmt(o.fabric_type)} | Estado: ${fmt(o.status)} | Entrega: ${fmtDate(o.delivery_date)} | Precio: ${fmtMoney(o.price)} | Pagado: ${fmtMoney(o.paid_amount)} | Saldo: ${fmtMoney(o.remaining_balance)} | Creado: ${fmtDate(o.created_at)}${o.notes ? ` | Nota: ${o.notes}` : ''}`
+        `[${fmt(o.order_number)}] Cliente: ${fmt(o.customer_name)}${nombreLimpio !== o.customer_name ? ` (también: ${nombreLimpio})` : ''} | Tel: ${fmt(o.phone)} | Prenda: ${fmt(o.garment_type)} | Artículo: ${fmt(o.article_name)} | Talle: ${fmt(o.sizes)} | Cant: ${fmt(o.quantity)} | Trabajo: ${fmt(o.work_type)} | Tela: ${fmt(o.fabric_type)} | Estado: ${fmt(o.status)} | Prioridad: ${fmt(o.priority)} | Entrega: ${fmtDate(o.delivery_date)} | Precio: ${fmtMoney(o.price)} | Pagado: ${fmtMoney(o.paid_amount)} | Saldo: ${fmtMoney(o.remaining_balance)} | Creado: ${fmtDate(o.created_at)}${o.notes ? ` | Nota: ${o.notes}` : ''}`
       );
     }
   }

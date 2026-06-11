@@ -90,14 +90,18 @@ export interface AiSystemContext {
   allOrders: Array<{
     order_number: string;
     customer_name: string;
+    customer_id: string | null;
     phone: string;
     garment_type: string;
+    article_name: string;
     sizes: string;
     quantity: number;
     fabric_type: string;
+    work_type: string;
     notes: string;
     delivery_date: string | null;
     status: string;
+    priority: string;
     price: number;
     paid_amount: number;
     remaining_balance: number;
@@ -182,7 +186,7 @@ export interface AiSystemContext {
 }
 
 export async function getAiSystemContext(): Promise<AiSystemContext> {
-  const pendingStatuses = ['nuevo', 'en_proceso', 'esperando_confirmacion'];
+  const pendingStatuses = ['nuevo', 'en_proceso', 'esperando_confirmacion', 'confirmado', 'terminado', 'listo_entregar'];
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
@@ -207,9 +211,9 @@ export async function getAiSystemContext(): Promise<AiSystemContext> {
 
     supabase
       .from('orders')
-      .select('order_number, customer_name, phone, garment_type, sizes, quantity, fabric_type, notes, delivery_date, status, price, paid_amount, remaining_balance, created_at')
+      .select('order_number, customer_name, customer_id, phone, garment_type, article_name, sizes, quantity, fabric_type, work_type, notes, delivery_date, status, priority, price, paid_amount, remaining_balance, created_at')
       .order('created_at', { ascending: false })
-      .limit(100),
+      .limit(200),
 
     supabase
       .from('customers')
