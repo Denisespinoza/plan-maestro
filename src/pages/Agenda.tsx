@@ -552,7 +552,7 @@ export default function Agenda() {
         </div>
       )}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      {viewMode !== 'kanban' && <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {[
           { label: 'Actividades de hoy', value: summary.today, icon: CalendarDays, tone: 'teal' },
           { label: 'Pendientes', value: summary.pending, icon: Clock, tone: 'violet' },
@@ -568,9 +568,9 @@ export default function Agenda() {
             <p className="mt-3 text-3xl font-black text-white">{card.value}</p>
           </div>
         ))}
-      </section>
+      </section>}
 
-      <section className="rounded-3xl border border-slate-700/70 bg-slate-950/70 p-4 shadow-xl md:p-5">
+      {viewMode !== 'kanban' && <section className="rounded-3xl border border-slate-700/70 bg-slate-950/70 p-4 shadow-xl md:p-5">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
           <Filter size={16} /> Filtros operativos
         </div>
@@ -596,7 +596,7 @@ export default function Agenda() {
             {users.map(item => <option key={item.id} value={item.id}>{item.full_name || item.email}</option>)}
           </select>
         </div>
-      </section>
+      </section>}
 
       <section className="overflow-hidden rounded-3xl border border-slate-700/70 bg-slate-950/80 shadow-2xl">
         <div className="flex flex-col gap-4 border-b border-slate-800 p-4 md:flex-row md:items-center md:justify-between md:p-5">

@@ -685,7 +685,7 @@ export default function KanbanBoard({ events, customers, users, userId, isAdmin,
               </div>
 
               {/* Cards */}
-              <div className={`flex-1 space-y-3 p-3 min-h-[200px] transition-colors ${isDragTarget ? 'bg-teal-900/10 rounded-b-3xl' : ''}`}>
+              <div className={`flex-1 space-y-3 p-3 overflow-y-auto transition-colors ${isDragTarget ? 'bg-teal-900/10 rounded-b-3xl' : ''}`} style={{ minHeight: '65vh', maxHeight: '72vh' }}>
                 {colEvents.length === 0 && (
                   <div className="flex h-24 items-center justify-center rounded-2xl border border-dashed border-slate-700/50 text-xs text-slate-600">
                     {isDragTarget ? 'Soltar aquí' : 'Sin tareas'}
