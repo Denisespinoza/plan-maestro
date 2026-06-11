@@ -177,24 +177,32 @@ async function compressImage(file: File): Promise<Blob> {
   });
 }
 
-// Upload catalog image — compresses to ≤500KB before uploading
+// Upload catalog image — compresses to ≤500KB then uploads to Cloudflare R2
 export async function uploadCatalogImage(file: File, itemId: string): Promise<string> {
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new Error(`El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)}MB. El máximo permitido es 5MB.`);
   }
 
   const compressed = await compressImage(file);
-  const ext = 'jpg';
-  const path = `catalog/${itemId}/${Date.now()}.${ext}`;
+  const path = `catalog/${itemId}/${Date.now()}.jpg`;
 
-  const { error } = await supabase.storage
-    .from('catalog-images')
-    .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' });
+  // Subir vía API server-side (credenciales R2 nunca se exponen al browser)
+  const formData = new FormData();
+  formData.append('file', new Blob([compressed], { type: 'image/jpeg' }), 'image.jpg');
+  formData.append('path', path);
 
-  if (error) throw error;
+  const response = await fetch('/api/r2-upload', {
+    method: 'POST',
+    body: formData,
+  });
 
-  const { data } = supabase.storage.from('catalog-images').getPublicUrl(path);
-  return data.publicUrl;
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `Error al subir imagen (HTTP ${response.status})`);
+  }
+
+  const { url } = await response.json();
+  return url;
 }
 
 // Get catalog stats
