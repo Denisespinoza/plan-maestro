@@ -7,6 +7,7 @@ import {
   deleteCatalogItem,
   getCatalogStats,
   uploadCatalogImage,
+  migrateCatalogImagesToR2,
 } from '../lib/internalCatalog';
 import { getModels } from '../lib/inventory';
 import type { CatalogItem, CatalogStatus, Category, InventoryModel } from '../lib/types';
@@ -75,12 +76,10 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
     setMigrating(true);
     setMigrateResult(null);
     try {
-      const res = await fetch('/api/r2-migrate', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error en migración');
-      setMigrateResult(data);
+      const result = await migrateCatalogImagesToR2();
+      setMigrateResult(result);
       setShowMigrateModal(true);
-      await loadData(); // Refrescar con las nuevas URLs
+      await loadData();
     } catch (e: any) {
       alert('Error al migrar: ' + (e.message || 'Error desconocido'));
     } finally {

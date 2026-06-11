@@ -205,6 +205,62 @@ export async function uploadCatalogImage(file: File, itemId: string): Promise<st
   return url;
 }
 
+// Migrate catalog images from Supabase to Cloudflare R2 (runs client-side)
+export async function migrateCatalogImagesToR2(): Promise<{ total: number; migrated: number; skipped: number; failed: number }> {
+  const { data: items, error } = await supabase
+    .from('internal_catalog')
+    .select('id, name, photo_url')
+    .not('photo_url', 'eq', '')
+    .not('photo_url', 'is', null);
+
+  if (error) throw error;
+
+  let migrated = 0, skipped = 0, failed = 0;
+  const r2Endpoint = import.meta.env.VITE_R2_PUBLIC_URL || '';
+
+  for (const item of items || []) {
+    const url = item.photo_url as string;
+
+    // Already in R2 or not from Supabase
+    if (!url.includes('supabase.co') || (r2Endpoint && url.includes(r2Endpoint))) {
+      skipped++;
+      continue;
+    }
+
+    try {
+      // Download from Supabase
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const ext = blob.type.includes('png') ? 'png' : 'jpg';
+      const fileName = `${Date.now()}_${item.id}.${ext}`;
+      const path = `catalog/${item.id}/${fileName}`;
+      const file = new File([blob], fileName, { type: blob.type });
+
+      // Upload to Supabase Storage (will use R2 if configured via Storage settings)
+      // Actually upload as new file and update URL
+      const { error: uploadError } = await supabase.storage
+        .from('catalog-images')
+        .upload(path, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('catalog-images').getPublicUrl(path);
+
+      await supabase
+        .from('internal_catalog')
+        .update({ photo_url: urlData.publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', item.id);
+
+      migrated++;
+    } catch {
+      failed++;
+    }
+  }
+
+  return { total: (items || []).length, migrated, skipped, failed };
+}
+
 // Get catalog stats
 export async function getCatalogStats() {
   const { data: items } = await supabase
