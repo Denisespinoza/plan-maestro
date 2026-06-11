@@ -220,8 +220,11 @@ function DetailModal({ event, customers, users, userId, canEditFully, onClose, o
       // All done?
       const allDone = updated.every(i => i.completed) && updated.length > 0;
       if (allDone && event.status !== 'completado') {
-        if (confirm('¡Todas las subtareas completadas! ¿Marcar la tarea como Completada?')) {
+        if (confirm('¡Todas las subtareas completadas! ¿Marcar la tarea como Finalizada?')) {
           await updateAgendaEvent(event.id, { status: 'completado' });
+          if (event.order_id) {
+            try { await syncKanbanToOrder(event, 'completado'); } catch (e) { console.warn('[sync]', e); }
+          }
           onSaved();
         }
       }
@@ -248,10 +251,14 @@ function DetailModal({ event, customers, users, userId, canEditFully, onClose, o
   };
 
   const handleMarkComplete = async () => {
-    if (!confirm('¿Marcar esta tarea como Completada?')) return;
+    if (!confirm('¿Marcar esta tarea como Finalizada?')) return;
     setSaving(true);
     try {
       await updateAgendaEvent(event.id, { status: 'completado' });
+      // Sincronizar con pedido vinculado si existe
+      if (event.order_id) {
+        try { await syncKanbanToOrder(event, 'completado'); } catch (e) { console.warn('[sync]', e); }
+      }
       onSaved();
       onClose();
     } catch (e) { console.error(e); }

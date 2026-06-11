@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import KanbanBoard from './AgendaKanban';
+import { syncKanbanToOrder } from '../lib/orderAgendaSync';
 import {
   AlertCircle,
   ArrowLeft,
@@ -471,6 +472,10 @@ export default function Agenda() {
         } else {
           await updateAgendaEvent(editingEvent.id, { status: form.status });
         }
+        // Sincronizar estado con pedido vinculado si existe
+        if (editingEvent.order_id) {
+          try { await syncKanbanToOrder({ ...editingEvent, status: form.status }, form.status); } catch (e) { console.warn('[sync] No se pudo actualizar el pedido:', e); }
+        }
       } else {
         await createAgendaEvent(form, user.id);
       }
@@ -487,6 +492,10 @@ export default function Agenda() {
   const handleStatusChange = async (event: AgendaEvent, status: AgendaEvent['status']) => {
     try {
       await updateAgendaEvent(event.id, { status });
+      // Sincronizar con pedido vinculado si existe
+      if (event.order_id) {
+        try { await syncKanbanToOrder(event, status); } catch (e) { console.warn('[sync] No se pudo actualizar el pedido:', e); }
+      }
       await loadAgenda();
       setSelectedEvent(current => current?.id === event.id ? { ...current, status } : current);
     } catch (err) {

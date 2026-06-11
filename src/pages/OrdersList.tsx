@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { Order, OrderStatus, Priority } from '../lib/types';
 import { STATUS_CONFIG, STATUS_OPTIONS, PRIORITY_CONFIG, PRIORITY_OPTIONS } from '../lib/types';
 import { updateOrder, duplicateOrder } from '../lib/orders';
+import { useAuth } from '../lib/AuthContext';
 import { formatWhatsAppMessage, getWhatsAppLink } from '../lib/clients';
 import { exportToCSV, exportToPDFSimple } from '../lib/exports';
 import StatusBadge from '../components/StatusBadge';
@@ -75,6 +76,7 @@ const isUrgentOrder = (order: OrderWithOptionalFields) => {
 };
 
 export default function OrdersList({ onNavigate }: OrdersListProps) {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -169,7 +171,7 @@ export default function OrdersList({ onNavigate }: OrdersListProps) {
       const updates: Partial<Order> = {};
       if (editStatus) updates.status = editStatus;
       if (editPaid !== '') updates.paid_amount = parseFloat(editPaid) || 0;
-      await updateOrder(orderId, updates);
+      await updateOrder(orderId, updates, user?.id);
       setEditingId(null);
       loadOrders();
     } catch (err) {
