@@ -327,3 +327,91 @@ export async function sendAiChat(messages: AiChatMessage[], context: PmAiContext
   if (typeof payload.reply !== 'string' || !payload.reply.trim()) throw new Error('Respuesta vacía del asistente.');
   return payload.reply.trim();
 }
+
+// ─── MAPA DE FUTURO ───────────────────────────────────────────────────────────
+
+export type VisionArea = 'negocios' | 'familia' | 'salud' | 'dinero' | 'viajes' | 'estilo_vida' | 'mentalidad';
+export type VisionStatus = 'sonado' | 'planificacion' | 'en_proceso' | 'logrado';
+
+export interface FutureVision {
+  id: string;
+  user_id: string;
+  title: string;
+  area: VisionArea;
+  timeframe: Timeframe;
+  status: VisionStatus;
+  priority: Priority;
+  target_date: string | null;
+  description: string | null;
+  image_url: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export const VISION_AREA_CONFIG: Record<VisionArea, { label: string; color: string; bg: string; border: string; emoji: string }> = {
+  negocios:    { label: 'Negocios',          color: 'text-bordo-300',   bg: 'bg-bordo-500/20',   border: 'border-bordo-500/40',   emoji: '🏢' },
+  familia:     { label: 'Familia',           color: 'text-rose-300',    bg: 'bg-rose-500/20',    border: 'border-rose-500/40',    emoji: '👨‍👩‍👧' },
+  salud:       { label: 'Salud',             color: 'text-emerald-300', bg: 'bg-emerald-500/20', border: 'border-emerald-500/40', emoji: '💪' },
+  dinero:      { label: 'Dinero / Patrimonio', color: 'text-dorado-300', bg: 'bg-dorado-500/20', border: 'border-dorado-500/40', emoji: '💰' },
+  viajes:      { label: 'Viajes',            color: 'text-sky-300',     bg: 'bg-sky-500/20',     border: 'border-sky-500/40',     emoji: '✈️' },
+  estilo_vida: { label: 'Estilo de vida',    color: 'text-violet-300',  bg: 'bg-violet-500/20',  border: 'border-violet-500/40',  emoji: '🌿' },
+  mentalidad:  { label: 'Mentalidad',        color: 'text-amber-300',   bg: 'bg-amber-500/20',   border: 'border-amber-500/40',   emoji: '🧠' },
+};
+
+export const VISION_STATUS_CONFIG: Record<VisionStatus, { label: string; color: string; bg: string }> = {
+  sonado:       { label: 'Soñado',          color: 'text-plata-400',   bg: 'bg-plata-700/40' },
+  planificacion:{ label: 'En planificación', color: 'text-dorado-300',  bg: 'bg-dorado-900/40' },
+  en_proceso:   { label: 'En proceso',      color: 'text-bordo-300',   bg: 'bg-bordo-900/40' },
+  logrado:      { label: 'Logrado',         color: 'text-emerald-300', bg: 'bg-emerald-900/30' },
+};
+
+export async function getFutureVisions(): Promise<FutureVision[]> {
+  const { data, error } = await supabase
+    .from('pm_future_visions')
+    .select('*')
+    .order('position')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createFutureVision(v: Omit<FutureVision, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<FutureVision> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+  const { data, error } = await supabase
+    .from('pm_future_visions')
+    .insert({ ...v, user_id: user.id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateFutureVision(id: string, v: Partial<Omit<FutureVision, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<void> {
+  const { error } = await supabase.from('pm_future_visions').update(v).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteFutureVision(id: string): Promise<void> {
+  const { error } = await supabase.from('pm_future_visions').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Subida de imagen a Supabase Storage
+export async function uploadVisionImage(file: File): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const fileName = `${user.id}/${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from('vision-images')
+    .upload(fileName, file, { upsert: true, contentType: file.type });
+
+  if (error) throw new Error(`Error subiendo imagen: ${error.message}`);
+
+  const { data } = supabase.storage.from('vision-images').getPublicUrl(fileName);
+  return data.publicUrl;
+}
