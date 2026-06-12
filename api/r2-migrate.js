@@ -67,17 +67,42 @@ export default async function handler(req, res) {
     let skipped = 0;
     let failed = 0;
 
+    const r2PublicBase = process.env.R2_PUBLIC_URL || r2Endpoint;
+
     for (const item of items || []) {
       const photoUrl = item.photo_url;
 
-      // Saltear si ya está en R2
-      if (photoUrl.includes('r2.cloudflarestorage.com') || photoUrl.includes(r2Endpoint)) {
+      // Si ya tiene la URL pública correcta → saltar
+      if (r2PublicBase && photoUrl.startsWith(r2PublicBase)) {
         skipped++;
         results.push({ id: item.id, name: item.name, status: 'already_r2', url: photoUrl });
         continue;
       }
 
-      // Solo migrar imágenes de Supabase Storage
+      // Si tiene la URL privada de R2 (cloudflarestorage.com) → solo corregir la URL, no re-subir
+      if (photoUrl.includes('r2.cloudflarestorage.com')) {
+        try {
+          // Extraer el path después del nombre del bucket
+          const match = photoUrl.match(/r2\.cloudflarestorage\.com\/[^/]+\/(.+)/);
+          if (match) {
+            const newUrl = `${r2PublicBase}/${match[1]}`;
+            await supabase.from('internal_catalog')
+              .update({ photo_url: newUrl, updated_at: new Date().toISOString() })
+              .eq('id', item.id);
+            migrated++;
+            results.push({ id: item.id, name: item.name, status: 'fixed_url', oldUrl: photoUrl, newUrl });
+          } else {
+            skipped++;
+            results.push({ id: item.id, name: item.name, status: 'skipped_cant_parse', url: photoUrl });
+          }
+        } catch (fixErr) {
+          failed++;
+          results.push({ id: item.id, name: item.name, status: 'failed', error: fixErr.message });
+        }
+        continue;
+      }
+
+      // Si no es de Supabase ni de R2 → saltar
       if (!photoUrl.includes('supabase')) {
         skipped++;
         results.push({ id: item.id, name: item.name, status: 'skipped_external', url: photoUrl });

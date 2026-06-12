@@ -72,12 +72,17 @@ export default function InternalCatalog({ onNavigate }: InternalCatalogProps) {
   const [showMigrateModal, setShowMigrateModal] = useState(false);
 
   const handleMigrateToR2 = async () => {
-    if (!confirm('¿Migrar todas las fotos del catálogo de Supabase a Cloudflare R2? Esto puede tardar unos minutos.')) return;
+    if (!confirm('¿Migrar todas las fotos del catálogo a Cloudflare R2? Esto puede tardar unos minutos.')) return;
     setMigrating(true);
     setMigrateResult(null);
     try {
-      const result = await migrateCatalogImagesToR2();
-      setMigrateResult(result);
+      const response = await fetch('/api/r2-migrate', { method: 'POST' });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `Error HTTP ${response.status}`);
+      }
+      const result = await response.json();
+      setMigrateResult({ total: result.total, migrated: result.migrated, skipped: result.skipped, failed: result.failed });
       setShowMigrateModal(true);
       await loadData();
     } catch (e: any) {
