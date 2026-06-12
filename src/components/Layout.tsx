@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useTheme } from '../lib/theme';
 import {
   Sun, Moon, Menu, X, LogOut, Crown, Shield,
-  CalendarCheck, LayoutDashboard, Target, FolderKanban, Bot, Compass,
+  CalendarCheck, LayoutDashboard, Target, FolderKanban, Bot, Compass, Flame,
 } from 'lucide-react';
 
-export type Page = 'hoy' | 'kanban' | 'metas' | 'proyectos' | 'mapa-futuro' | 'ai-assistant' | 'users';
+export type Page = 'hoy' | 'kanban' | 'metas' | 'proyectos' | 'mapa-futuro' | 'disciplina' | 'ai-assistant' | 'users';
 
 interface LayoutProps {
   currentPage: Page;
@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { page: 'metas',        label: 'Metas',         icon: Target },
   { page: 'proyectos',    label: 'Proyectos',     icon: FolderKanban },
   { page: 'mapa-futuro',  label: 'Mapa de Futuro', icon: Compass },
+  { page: 'disciplina',   label: 'Disciplina',    icon: Flame },
   { page: 'ai-assistant', label: 'Asistente IA',  icon: Bot },
   { page: 'users',        label: 'Usuarios',      icon: Shield, adminOnly: true },
 ];

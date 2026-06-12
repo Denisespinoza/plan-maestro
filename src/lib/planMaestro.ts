@@ -415,3 +415,188 @@ export async function uploadVisionImage(file: File): Promise<string> {
   const { data } = supabase.storage.from('vision-images').getPublicUrl(fileName);
   return data.publicUrl;
 }
+
+// ─── DISCIPLINA ───────────────────────────────────────────────────────────────
+
+export type HabitArea = 'salud' | 'trabajo' | 'estudio' | 'dinero' | 'familia' | 'mentalidad' | 'personal';
+export type HabitFrequency = 'diario' | 'semanal';
+export type HabitStatus = 'activo' | 'pausado' | 'abandonado';
+export type HabitLogStatus = 'completed' | 'failed' | 'paused';
+
+export interface Habit {
+  id: string;
+  user_id: string;
+  name: string;
+  area: HabitArea;
+  frequency: HabitFrequency;
+  priority: Priority;
+  status: HabitStatus;
+  suggested_time: string | null;
+  note: string | null;
+  current_streak: number;
+  best_streak: number;
+  total_completed: number;
+  total_failed: number;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HabitLog {
+  id: string;
+  habit_id: string;
+  user_id: string;
+  log_date: string;
+  status: HabitLogStatus;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const HABIT_AREA_CONFIG: Record<HabitArea, { label: string; color: string; bg: string; border: string; emoji: string }> = {
+  salud:      { label: 'Salud',      color: 'text-emerald-300', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', emoji: '💪' },
+  trabajo:    { label: 'Trabajo',    color: 'text-bordo-300',   bg: 'bg-bordo-500/15',   border: 'border-bordo-500/30',   emoji: '💼' },
+  estudio:    { label: 'Estudio',    color: 'text-sky-300',     bg: 'bg-sky-500/15',     border: 'border-sky-500/30',     emoji: '📚' },
+  dinero:     { label: 'Dinero',     color: 'text-dorado-300',  bg: 'bg-dorado-500/15',  border: 'border-dorado-500/30',  emoji: '💰' },
+  familia:    { label: 'Familia',    color: 'text-rose-300',    bg: 'bg-rose-500/15',    border: 'border-rose-500/30',    emoji: '👨‍👩‍👧' },
+  mentalidad: { label: 'Mentalidad', color: 'text-amber-300',   bg: 'bg-amber-500/15',   border: 'border-amber-500/30',   emoji: '🧠' },
+  personal:   { label: 'Personal',   color: 'text-plata-300',   bg: 'bg-plata-600/15',   border: 'border-plata-500/30',   emoji: '⭐' },
+};
+
+// ─── CRUD HABITS ─────────────────────────────────────────────────────────────
+
+export async function getHabits(): Promise<Habit[]> {
+  const { data, error } = await supabase
+    .from('pm_habits')
+    .select('*')
+    .order('position')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createHabit(h: Omit<Habit, 'id' | 'user_id' | 'current_streak' | 'best_streak' | 'total_completed' | 'total_failed' | 'created_at' | 'updated_at'>): Promise<Habit> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+  const { data, error } = await supabase
+    .from('pm_habits')
+    .insert({ ...h, user_id: user.id, current_streak: 0, best_streak: 0, total_completed: 0, total_failed: 0 })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateHabit(id: string, h: Partial<Omit<Habit, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<void> {
+  const { error } = await supabase.from('pm_habits').update(h).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteHabit(id: string): Promise<void> {
+  const { error } = await supabase.from('pm_habits').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ─── HABIT LOGS ──────────────────────────────────────────────────────────────
+
+export async function getHabitLogs(habitIds: string[], fromDate: string): Promise<HabitLog[]> {
+  if (habitIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('pm_habit_logs')
+    .select('*')
+    .in('habit_id', habitIds)
+    .gte('log_date', fromDate)
+    .order('log_date', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Upsert: crea o actualiza el log del día
+export async function upsertHabitLog(habitId: string, logDate: string, status: HabitLogStatus): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+
+  // Upsert del log
+  const { error: logError } = await supabase
+    .from('pm_habit_logs')
+    .upsert(
+      { habit_id: habitId, user_id: user.id, log_date: logDate, status },
+      { onConflict: 'habit_id,log_date' }
+    );
+  if (logError) throw logError;
+
+  // Recalcular contadores y racha en el hábito
+  await recalculateHabitStats(habitId);
+}
+
+async function recalculateHabitStats(habitId: string): Promise<void> {
+  // Traer todos los logs ordenados por fecha
+  const { data: logs, error } = await supabase
+    .from('pm_habit_logs')
+    .select('log_date, status')
+    .eq('habit_id', habitId)
+    .order('log_date', { ascending: true });
+
+  if (error || !logs) return;
+
+  const totalCompleted = logs.filter(l => l.status === 'completed').length;
+  const totalFailed = logs.filter(l => l.status === 'failed').length;
+
+  // Calcular racha actual (desde hoy hacia atrás, solo 'completed')
+  const today = new Date().toISOString().split('T')[0];
+  let currentStreak = 0;
+  let bestStreak = 0;
+  let tempStreak = 0;
+
+  // Ordenar por fecha descendente para calcular racha actual
+  const sorted = [...logs].sort((a, b) => b.log_date.localeCompare(a.log_date));
+
+  // Racha actual: días consecutivos completados desde hoy/ayer hacia atrás
+  let expectDate = today;
+  for (const log of sorted) {
+    if (log.log_date > expectDate) continue; // log futuro, ignorar
+    if (log.log_date === expectDate || log.log_date < expectDate) {
+      if (log.log_date < expectDate) {
+        // Hay un gap — si es 'paused' no rompemos, si es 'failed' o no existe sí
+        // Solo continuamos si el log es del día esperado
+        break;
+      }
+      if (log.status === 'completed') {
+        currentStreak++;
+        // retroceder un día
+        const d = new Date(expectDate);
+        d.setDate(d.getDate() - 1);
+        expectDate = d.toISOString().split('T')[0];
+      } else if (log.status === 'paused') {
+        // día pausado: no suma ni rompe
+        const d = new Date(expectDate);
+        d.setDate(d.getDate() - 1);
+        expectDate = d.toISOString().split('T')[0];
+      } else {
+        // failed: rompe racha
+        break;
+      }
+    }
+  }
+
+  // Mejor racha histórica (secuencia más larga de 'completed' consecutivos)
+  const asc = [...logs].sort((a, b) => a.log_date.localeCompare(b.log_date));
+  for (let i = 0; i < asc.length; i++) {
+    if (asc[i].status === 'completed') {
+      tempStreak++;
+      if (tempStreak > bestStreak) bestStreak = tempStreak;
+    } else if (asc[i].status === 'failed') {
+      tempStreak = 0;
+    }
+    // paused: no resetea tempStreak
+  }
+
+  const finalBest = Math.max(bestStreak, currentStreak);
+
+  await supabase.from('pm_habits').update({
+    total_completed: totalCompleted,
+    total_failed: totalFailed,
+    current_streak: currentStreak,
+    best_streak: finalBest,
+  }).eq('id', habitId);
+}

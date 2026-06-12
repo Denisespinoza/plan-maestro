@@ -8,6 +8,7 @@ import Metas from './pages/Metas';
 import Proyectos from './pages/Proyectos';
 import AiAssistant from './pages/AiAssistant';
 import MapaDeFuturo from './pages/MapaDeFuturo';
+import Disciplina from './pages/Disciplina';
 import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
 import { Crown } from 'lucide-react';
@@ -37,6 +38,7 @@ function AppContent() {
       case 'metas':        return <Metas />;
       case 'proyectos':    return <Proyectos />;
       case 'mapa-futuro':  return <MapaDeFuturo />;
+      case 'disciplina':   return <Disciplina />;
       case 'ai-assistant': return <AiAssistant />;
       case 'users':        return isAdmin ? <UserManagement /> : <Hoy />;
       default:             return <Hoy />;
