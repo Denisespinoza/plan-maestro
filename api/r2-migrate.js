@@ -22,9 +22,10 @@ function getR2Client() {
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error('Faltan variables SUPABASE_URL y SUPABASE_ANON_KEY en el servidor');
-  return createClient(url, key);
+  // Usar service role key para saltear RLS en operaciones del servidor
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('Faltan variables SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en el servidor');
+  return createClient(url, key, { auth: { persistSession: false } });
 }
 
 async function fileExistsInR2(client, bucket, key) {
