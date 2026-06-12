@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { Client, Employee, FinanceMovement, FinanceMovementStatus, FinanceMovementType, Order } from '../lib/types';
 import AccountsReceivableModule from './AccountsReceivable';
 import AccountsPayableModule from './AccountsPayable';
+import SavingsModule from './Savings';
 import { getReceivables, getPayables, computeReceivableSummary, computePayableSummary } from '../lib/debts';
 import {
   AlertCircle,
@@ -11,6 +12,7 @@ import {
   CheckCircle2,
   Coins,
   CreditCard,
+  PiggyBank,
   DollarSign,
   Edit3,
   FileSpreadsheet,
@@ -24,7 +26,7 @@ import {
   X,
 } from 'lucide-react';
 
-type ActiveTab = 'movements' | 'receivable' | 'payable';
+type ActiveTab = 'movements' | 'receivable' | 'payable' | 'savings';
 type DateFilter = 'day' | 'week' | 'month' | 'custom' | 'all';
 type MovementSource = 'manual' | 'order';
 
@@ -267,6 +269,7 @@ export default function Finance() {
   const [loading, setLoading] = useState(true);
   const [receivablePending, setReceivablePending] = useState(0);
   const [payablePending, setPayablePending] = useState(0);
+  const [totalSaved, setTotalSaved] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -283,6 +286,7 @@ export default function Finance() {
   useEffect(() => {
     loadFinanceData();
     loadDebtSummary();
+    loadTotalSaved();
   }, []);
 
   const loadDebtSummary = async () => {
@@ -290,6 +294,18 @@ export default function Finance() {
       const [rec, pay] = await Promise.all([getReceivables(), getPayables()]);
       setReceivablePending(computeReceivableSummary(rec).pending);
       setPayablePending(computePayableSummary(pay).pending);
+    } catch (e) { console.error(e); }
+  };
+
+  const loadTotalSaved = async () => {
+    try {
+      const { data } = await supabase
+        .from('savings_goals')
+        .select('current_amount')
+        .in('status', ['active', 'completed']);
+      if (data) {
+        setTotalSaved(data.reduce((sum, g) => sum + Number(g.current_amount), 0));
+      }
     } catch (e) { console.error(e); }
   };
 
@@ -736,6 +752,13 @@ export default function Finance() {
             <CreditCard size={14} /> Cuentas a Pagar
           </button>
           <button
+            onClick={() => setActiveTab('savings')}
+            className="px-3 py-2 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+            style={{ backgroundColor: activeTab === 'savings' ? '#5B21B6' : '#7C3AED' }}
+          >
+            <PiggyBank size={14} /> Ahorros
+          </button>
+          <button
             onClick={exportMovementsCSV}
             className="px-3 py-2 bg-petrol-700 hover:bg-petrol-600 text-crudo-200 rounded-lg text-xs font-medium border border-petrol-600 transition-colors flex items-center gap-1.5"
           >
@@ -798,11 +821,12 @@ export default function Finance() {
             />
           </div>
         )}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <SummaryCard label="Total ingresos" value={currency(summary.totalIncome)} icon={TrendingUp} color="bg-emerald-600" valueClass="text-emerald-600 dark:text-emerald-400" />
           <SummaryCard label="Total egresos" value={currency(summary.totalExpenses)} icon={TrendingDown} color="bg-rose-600" valueClass="text-rose-600 dark:text-rose-400" />
           <SummaryCard label="Ganancia neta" value={currency(summary.netProfit)} icon={DollarSign} color="bg-violet-500" valueClass={summary.netProfit >= 0 ? 'text-violet-600 dark:text-violet-400' : 'text-rose-600 dark:text-rose-400'} />
           <SummaryCard label="Caja actual" value={currency(summary.currentCash)} icon={Wallet} color="bg-petrol-600" valueClass="text-petrol-800 dark:text-white" />
+          <SummaryCard label="Total ahorrado" value={currency(totalSaved)} icon={PiggyBank} color="bg-violet-700" valueClass="text-violet-400 dark:text-violet-300" />
         </div>
       </section>
 
@@ -821,6 +845,14 @@ export default function Finance() {
             ← Volver a movimientos
           </button>
           <AccountsPayableModule />
+        </section>
+      )}
+      {activeTab === 'savings' && (
+        <section className="bg-crudo-50 dark:bg-slate-800 rounded-xl p-5 border-2 border-petrol-200 dark:border-slate-700/50" style={{ borderColor: '#7C3AED' }}>
+          <button onClick={() => setActiveTab('movements')} className="text-xs text-petrol-400 hover:text-crudo-200 mb-4 flex items-center gap-1">
+            ← Volver a movimientos
+          </button>
+          <SavingsModule />
         </section>
       )}
 

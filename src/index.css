@@ -54,3 +54,7 @@
 .finance-input {
   @apply w-full px-3 py-2 bg-white dark:bg-slate-900 border border-petrol-200 dark:border-slate-700 rounded-lg text-sm text-petrol-800 dark:text-white placeholder-petrol-400 focus:outline-none focus:ring-2 focus:ring-violet-500/60 focus:border-violet-400;
 }
+
+.savings-input {
+  @apply w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/60 focus:border-violet-500;
+}
