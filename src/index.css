@@ -12,7 +12,6 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, Oxygen, Ubuntu, sans-serif;
   }
 
-  /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -23,16 +22,16 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #B8A4FF;
+    background: #9A7A22;
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #9F7AEA;
+    background: #B8922A;
   }
 
   .dark ::-webkit-scrollbar-thumb {
-    background: #475569;
+    background: #495057;
   }
 }
 
@@ -41,20 +40,15 @@
     border-width: 3px;
   }
 
-  /* Custom shadows for CEO MODELTEX cards */
-  .shadow-modeltex {
-    box-shadow: 0 4px 12px rgba(15, 76, 92, 0.1), 0 2px 4px rgba(184, 164, 255, 0.05);
+  .shadow-pm {
+    box-shadow: 0 4px 12px rgba(107, 30, 46, 0.1), 0 2px 4px rgba(184, 146, 42, 0.05);
   }
 
-  .shadow-modeltex-lg {
-    box-shadow: 0 8px 24px rgba(15, 76, 92, 0.12), 0 4px 8px rgba(184, 164, 255, 0.08);
+  .shadow-pm-lg {
+    box-shadow: 0 8px 24px rgba(107, 30, 46, 0.14), 0 4px 8px rgba(184, 146, 42, 0.08);
   }
 }
 
-.finance-input {
-  @apply w-full px-3 py-2 bg-white dark:bg-slate-900 border border-petrol-200 dark:border-slate-700 rounded-lg text-sm text-petrol-800 dark:text-white placeholder-petrol-400 focus:outline-none focus:ring-2 focus:ring-violet-500/60 focus:border-violet-400;
-}
-
-.savings-input {
-  @apply w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/60 focus:border-violet-500;
+.pm-input {
+  @apply w-full px-3 py-2 bg-white dark:bg-plata-900 border border-plata-200 dark:border-plata-700 rounded-lg text-sm text-plata-800 dark:text-white placeholder-plata-400 focus:outline-none focus:ring-2 focus:ring-dorado-500/60 focus:border-dorado-400;
 }

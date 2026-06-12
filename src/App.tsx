@@ -1,99 +1,51 @@
 import { useState } from 'react';
 import { ThemeProvider } from './lib/theme';
 import { AuthProvider, useAuth } from './lib/AuthContext';
-import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import OrdersList from './pages/OrdersList';
-import NewOrder from './pages/NewOrder';
-import OrderDetail from './pages/OrderDetail';
-import Finance from './pages/Finance';
-import Clients from './pages/Clients';
-import Inventory from './pages/Inventory';
-import MoldLibrary from './pages/MoldLibrary';
-import InternalCatalog from './pages/InternalCatalog';
-import Personal from './pages/Personal';
-import Agenda from './pages/Agenda';
+import Layout, { type Page } from './components/Layout';
+import Hoy from './pages/Hoy';
+import Kanban from './pages/Kanban';
+import Metas from './pages/Metas';
+import Proyectos from './pages/Proyectos';
 import AiAssistant from './pages/AiAssistant';
 import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
-
-type Page = 'dashboard' | 'orders' | 'new-order' | 'finance' | 'order-detail' | 'clients' | 'inventory' | 'library' | 'catalog' | 'personal' | 'agenda' | 'ai-assistant' | 'users';
+import { Crown } from 'lucide-react';
 
 function AppContent() {
   const { user, profile, isAdmin, loading, signOut } = useAuth();
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<Page>('hoy');
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-teal-400 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-gradient-to-br from-plata-900 via-plata-800 to-bordo-900 flex flex-col items-center justify-center gap-4">
+        <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-bordo-600 shadow-pm-lg">
+          <Crown size={32} className="text-dorado-300" />
+        </div>
+        <div className="w-8 h-8 border-4 border-dorado-400 border-t-transparent rounded-full animate-spin" />
+        <p className="text-plata-400 text-sm">Cargando Plan Maestro...</p>
       </div>
     );
   }
 
-  // Redirect to login if not authenticated
-  if (!user) {
-    return <Login />;
-  }
-
-  const handleNavigate = (page: string, orderId?: string, _clientId?: string, modelId?: string) => {
-    setCurrentPage(page as Page);
-    if (orderId) setSelectedOrderId(orderId);
-    if (modelId) setSelectedModelId(modelId);
-    if (page === 'new-order') {
-      setSelectedOrderId(null);
-      setSelectedModelId(null);
-    }
-    if (page === 'library' && !modelId) {
-      setSelectedModelId(null);
-    }
-  };
+  if (!user) return <Login />;
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard onNavigate={handleNavigate} />;
-      case 'orders':
-        return <OrdersList onNavigate={handleNavigate} />;
-      case 'new-order':
-        return <NewOrder onNavigate={handleNavigate} />;
-      case 'order-detail':
-        return selectedOrderId ? (
-          <OrderDetail orderId={selectedOrderId} onNavigate={handleNavigate} />
-        ) : (
-          <OrdersList onNavigate={handleNavigate} />
-        );
-      case 'clients':
-        return <Clients onNavigate={handleNavigate} />;
-      case 'finance':
-        return <Finance />;
-      case 'inventory':
-        return <Inventory onNavigate={handleNavigate} />;
-      case 'library':
-        return <MoldLibrary modelId={selectedModelId || undefined} onNavigate={handleNavigate} />;
-      case 'catalog':
-        return <InternalCatalog onNavigate={handleNavigate} />;
-      case 'personal':
-        return <Personal userRole={profile?.role} />;
-      case 'agenda':
-        return <Agenda />;
-      case 'ai-assistant':
-        return <AiAssistant />;
-      case 'users':
-        return <UserManagement />;
-      default:
-        return <Dashboard onNavigate={handleNavigate} />;
+      case 'hoy':          return <Hoy />;
+      case 'kanban':       return <Kanban />;
+      case 'metas':        return <Metas />;
+      case 'proyectos':    return <Proyectos />;
+      case 'ai-assistant': return <AiAssistant />;
+      case 'users':        return isAdmin ? <UserManagement /> : <Hoy />;
+      default:             return <Hoy />;
     }
   };
 
   return (
     <Layout
       currentPage={currentPage}
-      onNavigate={handleNavigate}
+      onNavigate={setCurrentPage}
       isAdmin={isAdmin}
-      userRole={profile?.role}
       onLogout={signOut}
     >
       {renderPage()}

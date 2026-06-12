@@ -101,9 +101,9 @@ export default function ConfigError() {
           </div>
 
           {/* Footer */}
-          <div className="bg-slate-900/50 border-t border-slate-700 p-4">
-            <p className="text-center text-xs text-slate-500">
-              CEO MODELTEX - Centro de Operaciones Modeltex
+          <div className="bg-plata-900/50 border-t border-plata-700 p-4">
+            <p className="text-center text-xs text-plata-500">
+              Plan Maestro — Centro de Control Personal
             </p>
           </div>
         </div>

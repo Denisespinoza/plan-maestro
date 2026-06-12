@@ -12,14 +12,14 @@ const ThemeContext = createContext<ThemeContextType>({ theme: 'light', toggleThe
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('modeltex-theme') as Theme) || 'light';
+      return (localStorage.getItem('planmaestro-theme') as Theme) || 'dark';
     }
     return 'light';
   });
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
-    localStorage.setItem('modeltex-theme', theme);
+    localStorage.setItem('planmaestro-theme', theme);
   }, [theme]);
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
