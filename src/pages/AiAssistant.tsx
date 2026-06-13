@@ -25,7 +25,7 @@ const QUICK_PROMPTS = [
 
 const WELCOME: AiChatMessage = {
   role: 'assistant',
-  content: 'Hola. Soy Maestro, tu asistente estratégico. Tengo acceso de solo lectura a todas tus tareas, metas y proyectos. Preguntame lo que necesités.',
+  content: 'Soy CEO DENIS, el sistema de control personal de Denis Espinoza. Puedo ayudarte a revisar tareas, metas, proyectos, disciplina, radar y visión para decidir qué hacer primero.',
 };
 
 function formatRelativeDate(d: string) {
