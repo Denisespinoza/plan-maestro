@@ -814,9 +814,10 @@ export async function duplicateRadar(id: string): Promise<PmRadar> {
     .select().single();
   if (cErr) throw cErr;
 
-  const areas = (areasRes.data ?? []).map(a => ({
+  const ts = Date.now();
+  const areas = (areasRes.data ?? []).map((a, i) => ({
     radar_id: copy.id, user_id: user.id,
-    area_key: `${a.area_key}_copy`,
+    area_key: `dup_${ts}_${i}`,
     display_name: a.display_name,
     sort_order: a.sort_order, is_required: false, is_active: a.is_active,
   }));

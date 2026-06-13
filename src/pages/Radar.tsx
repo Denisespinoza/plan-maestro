@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import {
   type PmRadar, type RadarAreaDef, type RadarEvaluation, type RadarScore,
-  LIFE_RADAR_AREA_DEFS, calcRadarMetrics, getAreaStatus,
-  getRadars, getLifeRadar, createCustomRadar, updateRadar,
+  calcRadarMetrics, getAreaStatus,
+  getRadars, createCustomRadar, updateRadar,
   archiveRadar, reactivateRadar, duplicateRadar, deleteRadar,
   getRadarAreaDefs, updateAreaDef, addAreaToRadar, removeAreaFromRadar,
   getRadarEvaluations, createRadarEvaluation, updateRadarEvaluation,
@@ -254,7 +254,11 @@ function CustomRadarsList({ active, archived, showArchived, archivedCount, onTog
   onUpdateMeta: (id: string, name: string, desc: string) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(active[0]?.id ?? null);
+
+  // Bug fix: if selectedId no longer exists in active, reset to first active
   const selectedRadar = [...active, ...archived].find(r => r.id === selectedId);
+  const effectiveSelectedId = selectedRadar ? selectedId : (active[0]?.id ?? null);
+  const effectiveRadar = [...active, ...archived].find(r => r.id === effectiveSelectedId);
 
   return (
     <div className="flex flex-col gap-4">
@@ -263,7 +267,7 @@ function CustomRadarsList({ active, archived, showArchived, archivedCount, onTog
         {active.map(r => (
           <button key={r.id} onClick={() => setSelectedId(r.id)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
-              selectedId === r.id ? 'bg-dorado-500/20 text-dorado-200 border-dorado-500/50' : 'text-plata-400 border-plata-700/50 hover:text-white hover:border-plata-500'
+              effectiveSelectedId === r.id ? 'bg-dorado-500/20 text-dorado-200 border-dorado-500/50' : 'text-plata-400 border-plata-700/50 hover:text-white hover:border-plata-500'
             }`}>
             {r.name}
           </button>
@@ -294,12 +298,12 @@ function CustomRadarsList({ active, archived, showArchived, archivedCount, onTog
       )}
 
       {/* Selected radar view */}
-      {selectedRadar && (
+      {effectiveRadar && (
         <RadarView
-          radar={selectedRadar}
-          onArchive={() => onArchive(selectedRadar.id)}
-          onDuplicate={() => onDuplicate(selectedRadar.id)}
-          onDelete={() => onDelete(selectedRadar.id)}
+          radar={effectiveRadar}
+          onArchive={() => onArchive(effectiveRadar.id)}
+          onDuplicate={() => onDuplicate(effectiveRadar.id)}
+          onDelete={() => onDelete(effectiveRadar.id)}
           onUpdateMeta={onUpdateMeta}
         />
       )}
@@ -418,10 +422,11 @@ function RadarView({ radar, onArchive, onDuplicate, onDelete, onUpdateMeta }: {
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {areaDefs.length > 0 && radar.type === 'custom' && (
+          {areaDefs.length > 0 && (
             <button onClick={() => setShowEditAreas(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-plata-700 text-plata-400 hover:text-white rounded-lg transition-colors">
-              <Settings size={12} /> Áreas
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-plata-700 text-plata-400 hover:text-white rounded-lg transition-colors"
+              title={radar.type === 'fixed' ? 'Renombrar áreas' : 'Editar áreas'}>
+              <Settings size={12} /> {radar.type === 'fixed' ? 'Renombrar áreas' : 'Áreas'}
             </button>
           )}
           <button onClick={() => setShowEditRadar(true)}
@@ -585,6 +590,7 @@ function RadarView({ radar, onArchive, onDuplicate, onDelete, onUpdateMeta }: {
       {showEditAreas && (
         <EditAreasModal
           radar={radar} areaDefs={areaDefs}
+          isFixed={radar.type === 'fixed'}
           onSave={handleAreaDefsUpdate}
           onClose={() => setShowEditAreas(false)}
         />
@@ -1024,8 +1030,9 @@ function EditRadarMetaModal({ radar, onSave, onClose }: {
 
 // ─── EDIT AREAS MODAL ─────────────────────────────────────────────────────────
 
-function EditAreasModal({ radar, areaDefs, onSave, onClose }: {
+function EditAreasModal({ radar, areaDefs, isFixed, onSave, onClose }: {
   radar: PmRadar; areaDefs: RadarAreaDef[];
+  isFixed: boolean;
   onSave: (defs: RadarAreaDef[]) => void; onClose: () => void;
 }) {
   const [defs, setDefs] = useState<RadarAreaDef[]>([...areaDefs]);
@@ -1036,11 +1043,15 @@ function EditAreasModal({ radar, areaDefs, onSave, onClose }: {
   const activeDefs = defs.filter(d => d.is_active);
 
   async function handleRename(id: string, newName: string) {
-    await updateAreaDef(id, { display_name: newName });
-    setDefs(prev => prev.map(d => d.id === id ? { ...d, display_name: newName } : d));
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    // Optimistic update first so "Listo" always sees the new value
+    setDefs(prev => prev.map(d => d.id === id ? { ...d, display_name: trimmed } : d));
+    await updateAreaDef(id, { display_name: trimmed });
   }
 
   async function handleRemove(id: string) {
+    if (isFixed) return; // Radar de Vida: no se pueden eliminar áreas
     if (activeDefs.length <= 3) { setError('Mínimo 3 áreas activas.'); return; }
     await removeAreaFromRadar(id);
     setDefs(prev => prev.filter(d => d.id !== id));
@@ -1048,6 +1059,7 @@ function EditAreasModal({ radar, areaDefs, onSave, onClose }: {
   }
 
   async function handleAdd() {
+    if (isFixed) return; // Radar de Vida: no se pueden agregar áreas
     if (!newAreaName.trim()) return;
     if (activeDefs.length >= 16) { setError('Máximo 16 áreas.'); return; }
     setSaving(true);
@@ -1064,27 +1076,32 @@ function EditAreasModal({ radar, areaDefs, onSave, onClose }: {
     <div className="fixed inset-0 z-50 flex items-start justify-center p-2 sm:p-4 pt-6 bg-black/75 backdrop-blur-sm overflow-y-auto">
       <div className="w-full max-w-md rounded-2xl border border-plata-700/60 bg-plata-900 shadow-pm-lg mb-8">
         <div className="flex items-center justify-between px-5 py-4 border-b border-plata-700/50">
-          <h3 className="text-base font-bold text-white">Editar áreas — {radar.name}</h3>
+          <div>
+            <h3 className="text-base font-bold text-white">{isFixed ? 'Renombrar áreas' : 'Editar áreas'} — {radar.name}</h3>
+            {isFixed && <p className="text-xs text-plata-500 mt-0.5">Solo podés cambiar el nombre visible. Las áreas no se pueden agregar ni eliminar.</p>}
+          </div>
           <button onClick={onClose} className="p-1 text-plata-400 hover:text-white rounded"><X size={18} /></button>
         </div>
         <div className="p-5 flex flex-col gap-3">
-          <p className="text-xs text-plata-500">{activeDefs.length} áreas activas · mín. 3, máx. 16</p>
+          {!isFixed && <p className="text-xs text-plata-500">{activeDefs.length} áreas activas · mín. 3, máx. 16</p>}
           {defs.filter(d => d.is_active).map((d) => (
             <div key={d.id} className="flex items-center gap-2">
-              <GripVertical size={14} className="text-plata-700 shrink-0" />
+              {!isFixed && <GripVertical size={14} className="text-plata-700 shrink-0" />}
+              {isFixed && <span className="text-xs text-plata-600 w-5 shrink-0 text-center">{defs.filter(x => x.is_active).indexOf(d) + 1}.</span>}
               <input
                 defaultValue={d.display_name}
-                onBlur={e => { if (e.target.value.trim() && e.target.value !== d.display_name) handleRename(d.id, e.target.value.trim()); }}
+                onBlur={e => { if (e.target.value !== d.display_name) handleRename(d.id, e.target.value); }}
                 className="pm-input flex-1 text-sm"
               />
-              {!d.is_required && (
+              {/* Solo mostrar botón eliminar para radares custom y áreas no-required */}
+              {!isFixed && !d.is_required && (
                 <button onClick={() => handleRemove(d.id)} className="p-1.5 text-plata-600 hover:text-red-400 rounded transition-colors shrink-0"><Trash2 size={12} /></button>
               )}
             </div>
           ))}
 
-          {/* Add new area */}
-          {activeDefs.length < 16 && (
+          {/* Agregar área: solo para radares custom */}
+          {!isFixed && activeDefs.length < 16 && (
             <div className="flex gap-2 mt-1">
               <input value={newAreaName} onChange={e => setNewAreaName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
@@ -1098,6 +1115,7 @@ function EditAreasModal({ radar, areaDefs, onSave, onClose }: {
           {error && <p className="text-xs text-red-400">{error}</p>}
         </div>
         <div className="flex gap-2 justify-end px-5 py-4 border-t border-plata-700/50">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-plata-300 rounded-lg border border-plata-700 hover:bg-plata-800 transition-colors">Cancelar</button>
           <button onClick={() => { onSave(defs.filter(d => d.is_active)); }} className="flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-dorado-600 hover:bg-dorado-500 text-plata-900 rounded-lg transition-colors">
             <Save size={14} /> Listo
           </button>
