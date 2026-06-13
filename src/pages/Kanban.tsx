@@ -143,7 +143,7 @@ export default function Kanban() {
       <div className="relative overflow-hidden rounded-2xl border border-bordo-500/30 bg-plata-900/80 p-4 shadow-pm">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,26,46,0.15),transparent_40%)]" />
         <div className="relative">
-          <p className="text-xs font-semibold uppercase tracking-widest text-dorado-400/80">Plan Maestro</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-dorado-400/80">Centro de Operaciones</p>
           <h1 className="text-xl font-bold text-white">Kanban</h1>
           <p className="text-sm text-plata-400">{tasks.filter(t => t.status !== 'hecho').length} tareas activas · {tasks.filter(t => t.status === 'hecho').length} completadas</p>
         </div>

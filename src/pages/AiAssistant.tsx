@@ -159,7 +159,7 @@ export default function AiAssistant() {
               <Sparkles className="h-6 w-6 text-dorado-300" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-dorado-300/80">Plan Maestro</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-dorado-300/80">Centro de Operaciones</p>
               <h1 className="text-xl font-bold text-white">Asistente Estratégico</h1>
             </div>
           </div>
@@ -178,7 +178,7 @@ export default function AiAssistant() {
               <div className="flex items-center gap-1.5 font-medium text-dorado-300">
                 <ShieldCheck size={14} /> Solo lectura
               </div>
-              <p className="text-xs text-plata-400">Plan Maestro</p>
+              <p className="text-xs text-plata-400">Centro de Operaciones</p>
             </div>
           </div>
         </div>
