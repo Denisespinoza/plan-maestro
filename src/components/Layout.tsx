@@ -61,8 +61,8 @@ export default function Layout({ currentPage, onNavigate, children, isAdmin = fa
             <Crown size={18} className="text-dorado-300" />
           </div>
           <div className="flex flex-col">
-            <span className="text-base font-bold text-white tracking-tight leading-tight whitespace-nowrap">Centro de Operaciones Denis</span>
-            <span className="text-[10px] text-dorado-400/70 leading-tight">Centro de Control Personal</span>
+            <span className="text-base font-bold text-white tracking-tight leading-tight whitespace-nowrap">CEO DENIS</span>
+            <span className="text-[10px] text-dorado-400/70 leading-tight">Centro de Operaciones Denis</span>
           </div>
         </div>
 
@@ -126,7 +126,7 @@ export default function Layout({ currentPage, onNavigate, children, isAdmin = fa
         <div className="absolute bottom-4 left-3 right-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-bordo-500/20 bg-bordo-900/30">
             <Crown size={14} className="text-dorado-400" />
-            <span className="text-xs text-dorado-400/70 font-medium">COD · Centro de Operaciones</span>
+            <span className="text-xs text-dorado-400/70 font-medium">CEO DENIS</span>
           </div>
         </div>
       </aside>

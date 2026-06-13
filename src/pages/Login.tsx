@@ -54,8 +54,8 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-bordo-600 rounded-2xl mb-4 shadow-lg shadow-bordo-600/30">
             <Crown size={32} className="text-dorado-300" />
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">CENTRO DE OPERACIONES</h1>
-          <p className="text-dorado-300/80 mt-1 text-sm">Centro de Control Personal · Denis</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">CEO DENIS</h1>
+          <p className="text-dorado-300/80 mt-1 text-sm">Centro de Operaciones Denis</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 space-y-4 border border-white/10 shadow-2xl">

@@ -25,7 +25,7 @@ function AppContent() {
           <Crown size={32} className="text-dorado-300" />
         </div>
         <div className="w-8 h-8 border-4 border-dorado-400 border-t-transparent rounded-full animate-spin" />
-        <p className="text-plata-400 text-sm">Cargando Centro de Operaciones...</p>
+        <p className="text-plata-400 text-sm">Cargando CEO DENIS...</p>
       </div>
     );
   }

@@ -103,7 +103,7 @@ export default function ConfigError() {
           {/* Footer */}
           <div className="bg-plata-900/50 border-t border-plata-700 p-4">
             <p className="text-center text-xs text-plata-500">
-              Centro de Operaciones Denis — Centro de Control Personal
+              CEO DENIS — Centro de Operaciones Denis
             </p>
           </div>
         </div>

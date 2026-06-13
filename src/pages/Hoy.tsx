@@ -87,7 +87,7 @@ export default function Hoy() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,26,46,0.18),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(184,146,42,0.10),transparent_40%)]" />
         <div className="relative flex items-center justify-between flex-wrap gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-dorado-400/80">Centro de Operaciones</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-dorado-400/80">CEO DENIS</p>
             <h1 className="text-2xl font-bold text-white capitalize">{TODAY}</h1>
             <p className="text-sm text-plata-400 mt-0.5">
               {mitTasks.length} MIT · {otherTasks.length} tareas adicionales
