@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Briefcase, ExternalLink, Plus, Clock, Timer, BarChart3,
+  ExternalLink, Plus, Clock, Timer, BarChart3,
   X, Save, Loader2, Link2, ChevronRight,
 } from 'lucide-react';
 import {
@@ -67,9 +67,9 @@ export default function BusinessQuickAccess() {
               <ChevronRight size={14} className={`text-plata-600 transition-transform ${openMenu === biz.id ? 'rotate-90' : ''}`} />
             </button>
 
-            {/* Popover */}
+            {/* Popover — abre hacia arriba para no quedar cortado por el scroll del nav */}
             {openMenu === biz.id && (
-              <div className="absolute left-2 right-2 mt-1 z-50 rounded-xl border border-plata-700/70 bg-plata-900 shadow-pm-lg overflow-hidden">
+              <div className="absolute left-2 right-2 bottom-full mb-1 z-50 rounded-xl border border-plata-700/70 bg-plata-900 shadow-pm-lg overflow-hidden">
                 <MenuItem icon={<ExternalLink size={13} />} label="Entrar" onClick={() => handleEntrar(biz)} />
                 <MenuItem icon={<Plus size={13} />} label="Asignar tarea" onClick={() => openModal('task', biz)} />
                 <MenuItem icon={<Clock size={13} />} label="Planificar tiempo hoy" onClick={() => openModal('plan', biz)} />
