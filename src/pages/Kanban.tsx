@@ -64,12 +64,26 @@ export default function Kanban() {
   const [form, setForm] = useState<TaskFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
-  const [filterBusiness, setFilterBusiness] = useState<string>('all');
+  const [filterBusiness, setFilterBusiness] = useState<string>(() => {
+    const pending = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('kanban_business_filter') : null;
+    if (pending) { sessionStorage.removeItem('kanban_business_filter'); return pending; }
+    return 'all';
+  });
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [editColumn, setEditColumn] = useState<KanbanColumn | null>(null);
   const dragRef = useRef<string | null>(null);
 
   useEffect(() => { load(); }, []);
+
+  // "Ver tareas" desde Mis negocios cuando ya estamos en Kanban
+  useEffect(() => {
+    function onFilterEvent() {
+      const pending = sessionStorage.getItem('kanban_business_filter');
+      if (pending) { sessionStorage.removeItem('kanban_business_filter'); setFilterBusiness(pending); }
+    }
+    window.addEventListener('kanban-filter', onFilterEvent);
+    return () => window.removeEventListener('kanban-filter', onFilterEvent);
+  }, []);
 
   async function load() {
     setLoading(true);

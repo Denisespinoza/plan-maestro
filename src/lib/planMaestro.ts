@@ -1259,6 +1259,62 @@ export const DEFAULT_BUSINESSES: Array<{ key: string; name: string; color: strin
   { key: 'moldey',   name: 'MOLDEY',   color: '#B8922A' }, // dorado
 ];
 
+// ── Enlaces externos por negocio ──
+export interface BusinessLink {
+  id: string;
+  user_id: string;
+  business_key: string;
+  label: string;
+  url: string | null;
+  type: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Enlaces por defecto (sin URL — se configuran después). NO inventar URLs.
+export const DEFAULT_BUSINESS_LINKS: Array<{ business_key: string; label: string; type: string }> = [
+  { business_key: 'modeltex', label: 'MODELTEX.STORE', type: 'website' },
+  { business_key: 'modeltex', label: 'CEO MODELTEX',   type: 'system' },
+  { business_key: 'modeltex', label: 'MODELTEX IA',    type: 'ai' },
+  { business_key: 'moldey',   label: 'MOLDEY.COM',     type: 'website' },
+  { business_key: 'moldey',   label: 'CEO MOLDEY',     type: 'system' },
+];
+
+export async function getBusinessLinks(): Promise<BusinessLink[]> {
+  const { data, error } = await supabase
+    .from('pm_business_links')
+    .select('*')
+    .eq('is_active', true)
+    .order('business_key')
+    .order('sort_order');
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Crea los enlaces por defecto si el usuario no tiene ninguno
+export async function ensureBusinessLinks(): Promise<BusinessLink[]> {
+  const existing = await getBusinessLinks();
+  if (existing.length > 0) return existing;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+
+  const rows = DEFAULT_BUSINESS_LINKS.map((l, i) => ({
+    user_id: user.id, business_key: l.business_key, label: l.label,
+    url: null, type: l.type, sort_order: i, is_active: true,
+  }));
+  const { data, error } = await supabase.from('pm_business_links').insert(rows).select();
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function updateBusinessLink(id: string, url: string | null): Promise<void> {
+  const { error } = await supabase.from('pm_business_links').update({ url }).eq('id', id);
+  if (error) throw error;
+}
+
 // Label + color para badges (usa los defaults; sirve aunque el negocio sea custom)
 export function businessBadge(key: string | null | undefined): { name: string; color: string } | null {
   if (!key) return null;

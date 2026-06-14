@@ -1,49 +1,57 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ExternalLink, Plus, Clock, Timer, BarChart3,
-  X, Save, Loader2, Link2, ChevronRight,
+  Plus, Clock, Timer, BarChart3, ListTodo,
+  X, Save, Loader2, ChevronRight, Globe, Cpu, Settings2,
 } from 'lucide-react';
 import {
-  type Business, type BusinessDaySummary,
-  ensureBusinesses, updateBusiness, upsertTimeBlock, getTimeBlock,
-  getBusinessDaySummary, createTask,
+  type Business, type BusinessLink, type BusinessDaySummary,
+  ensureBusinesses, ensureBusinessLinks, updateBusinessLink,
+  upsertTimeBlock, getTimeBlock, getBusinessDaySummary, createTask,
 } from '../lib/planMaestro';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
-type ModalKind = 'plan' | 'work' | 'summary' | 'task' | 'url' | null;
+type ModalKind = 'plan' | 'work' | 'summary' | 'task' | null;
 
-export default function BusinessQuickAccess() {
+function linkTypeIcon(type: string) {
+  if (type === 'system') return <Settings2 size={13} />;
+  if (type === 'ai') return <Cpu size={13} />;
+  return <Globe size={13} />;
+}
+
+export default function BusinessQuickAccess({ onNavigate }: { onNavigate?: (page: string) => void }) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [links, setLinks] = useState<BusinessLink[]>([]);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [modal, setModal] = useState<{ kind: ModalKind; biz: Business } | null>(null);
+  const [linkModal, setLinkModal] = useState<BusinessLink | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { load(); }, []);
 
-  // Cerrar popover al hacer click afuera
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpenMenu(null);
-      }
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpenMenu(null);
     }
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
   async function load() {
-    try { setBusinesses(await ensureBusinesses()); }
-    catch (e) { console.error(e); }
+    try {
+      const [b, l] = await Promise.all([ensureBusinesses(), ensureBusinessLinks()]);
+      setBusinesses(b);
+      setLinks(l);
+    } catch (e) { console.error(e); }
   }
 
-  function handleEntrar(biz: Business) {
-    setOpenMenu(null);
-    if (biz.url && biz.url.trim()) {
-      window.open(biz.url, '_blank', 'noopener,noreferrer');
+  function handleLink(link: BusinessLink) {
+    if (link.url && link.url.trim()) {
+      window.open(link.url, '_blank', 'noopener,noreferrer');
+      setOpenMenu(null);
     } else {
-      // sin URL → abrir modal para configurarla
-      setModal({ kind: 'url', biz });
+      setOpenMenu(null);
+      setLinkModal(link);
     }
   }
 
@@ -52,34 +60,58 @@ export default function BusinessQuickAccess() {
     setModal({ kind, biz });
   }
 
+  function verTareas(biz: Business) {
+    setOpenMenu(null);
+    sessionStorage.setItem('kanban_business_filter', biz.key);
+    onNavigate?.('kanban');
+    // Cubre el caso de estar ya en Kanban (no remonta): avisamos por evento
+    window.dispatchEvent(new CustomEvent('kanban-filter'));
+  }
+
   return (
     <div ref={containerRef} className="border-t border-plata-700/50 pt-3 mt-2">
       <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-plata-500">Mis negocios</p>
       <div className="space-y-1 px-1">
-        {businesses.map(biz => (
-          <div key={biz.id} className="relative">
-            <button
-              onClick={() => setOpenMenu(openMenu === biz.id ? null : biz.id)}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-plata-300 hover:bg-plata-800 hover:text-white transition-colors group"
-            >
-              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: biz.color ?? '#868E96' }} />
-              <span className="flex-1 text-left tracking-wide">{biz.name}</span>
-              <ChevronRight size={14} className={`text-plata-600 transition-transform ${openMenu === biz.id ? 'rotate-90' : ''}`} />
-            </button>
+        {businesses.map(biz => {
+          const bizLinks = links.filter(l => l.business_key === biz.key);
+          return (
+            <div key={biz.id} className="relative">
+              <button
+                onClick={() => setOpenMenu(openMenu === biz.id ? null : biz.id)}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-plata-300 hover:bg-plata-800 hover:text-white transition-colors"
+              >
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: biz.color ?? '#868E96' }} />
+                <span className="flex-1 text-left tracking-wide">{biz.name}</span>
+                <ChevronRight size={14} className={`text-plata-600 transition-transform ${openMenu === biz.id ? 'rotate-90' : ''}`} />
+              </button>
 
-            {/* Popover — abre hacia arriba para no quedar cortado por el scroll del nav */}
-            {openMenu === biz.id && (
-              <div className="absolute left-2 right-2 bottom-full mb-1 z-50 rounded-xl border border-plata-700/70 bg-plata-900 shadow-pm-lg overflow-hidden">
-                <MenuItem icon={<ExternalLink size={13} />} label="Entrar" onClick={() => handleEntrar(biz)} />
-                <MenuItem icon={<Plus size={13} />} label="Asignar tarea" onClick={() => openModal('task', biz)} />
-                <MenuItem icon={<Clock size={13} />} label="Planificar tiempo hoy" onClick={() => openModal('plan', biz)} />
-                <MenuItem icon={<Timer size={13} />} label="Registrar tiempo trabajado" onClick={() => openModal('work', biz)} />
-                <MenuItem icon={<BarChart3 size={13} />} label="Ver resumen" onClick={() => openModal('summary', biz)} />
-                <MenuItem icon={<Link2 size={13} />} label="Configurar enlace" onClick={() => openModal('url', biz)} />
-              </div>
-            )}
-          </div>
-        ))}
+              {openMenu === biz.id && (
+                <div className="absolute left-2 right-2 bottom-full mb-1 z-50 rounded-xl border border-plata-700/70 bg-plata-900 shadow-pm-lg overflow-hidden py-1">
+                  {/* Bloque A: Entrar a sistemas */}
+                  <p className="px-3 pt-1.5 pb-1 text-[9px] font-semibold uppercase tracking-widest text-plata-500">Entrar a sistemas</p>
+                  {bizLinks.length === 0 && <p className="px-3 py-1.5 text-[11px] text-plata-600">Sin enlaces.</p>}
+                  {bizLinks.map(l => (
+                    <MenuItem key={l.id}
+                      icon={linkTypeIcon(l.type)}
+                      label={l.label}
+                      hint={l.url ? undefined : 'sin URL'}
+                      onClick={() => handleLink(l)} />
+                  ))}
+
+                  <div className="my-1 border-t border-plata-700/50" />
+
+                  {/* Bloque B: Gestionar en CEO DENIS */}
+                  <p className="px-3 pt-1 pb-1 text-[9px] font-semibold uppercase tracking-widest text-plata-500">Gestionar en CEO DENIS</p>
+                  <MenuItem icon={<Plus size={13} />} label="Asignar tarea" onClick={() => openModal('task', biz)} />
+                  <MenuItem icon={<Clock size={13} />} label="Planificar tiempo hoy" onClick={() => openModal('plan', biz)} />
+                  <MenuItem icon={<Timer size={13} />} label="Registrar tiempo trabajado" onClick={() => openModal('work', biz)} />
+                  <MenuItem icon={<BarChart3 size={13} />} label="Ver resumen" onClick={() => openModal('summary', biz)} />
+                  <MenuItem icon={<ListTodo size={13} />} label="Ver tareas" onClick={() => verTareas(biz)} />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Modales */}
@@ -87,20 +119,21 @@ export default function BusinessQuickAccess() {
       {modal?.kind === 'work' && <TimeModal biz={modal.biz} mode="work" onClose={() => setModal(null)} />}
       {modal?.kind === 'summary' && <SummaryModal biz={modal.biz} onClose={() => setModal(null)} />}
       {modal?.kind === 'task' && <TaskModal biz={modal.biz} onClose={() => setModal(null)} />}
-      {modal?.kind === 'url' && (
-        <UrlModal biz={modal.biz} onClose={() => setModal(null)}
-          onSaved={(url) => { setBusinesses(prev => prev.map(b => b.id === modal.biz.id ? { ...b, url } : b)); setModal(null); }} />
+      {linkModal && (
+        <LinkUrlModal link={linkModal} onClose={() => setLinkModal(null)}
+          onSaved={(url) => { setLinks(prev => prev.map(l => l.id === linkModal.id ? { ...l, url } : l)); setLinkModal(null); }} />
       )}
     </div>
   );
 }
 
-function MenuItem({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+function MenuItem({ icon, label, hint, onClick }: { icon: React.ReactNode; label: string; hint?: string; onClick: () => void }) {
   return (
     <button onClick={onClick}
       className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-plata-300 hover:bg-plata-800 hover:text-white transition-colors text-left">
       <span className="text-plata-500">{icon}</span>
-      {label}
+      <span className="flex-1">{label}</span>
+      {hint && <span className="text-[9px] text-plata-600 italic">{hint}</span>}
     </button>
   );
 }
@@ -325,27 +358,27 @@ function TaskModal({ biz, onClose }: { biz: Business; onClose: () => void }) {
   );
 }
 
-// ─── URL MODAL (configurar enlace) ────────────────────────────────────────────
+// ─── LINK URL MODAL (configurar enlace externo) ───────────────────────────────
 
-function UrlModal({ biz, onClose, onSaved }: { biz: Business; onClose: () => void; onSaved: (url: string) => void }) {
-  const [url, setUrl] = useState(biz.url ?? '');
+function LinkUrlModal({ link, onClose, onSaved }: { link: BusinessLink; onClose: () => void; onSaved: (url: string) => void }) {
+  const [url, setUrl] = useState(link.url ?? '');
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     setSaving(true);
     try {
       const clean = url.trim();
-      await updateBusiness(biz.id, { url: clean || null });
+      await updateBusinessLink(link.id, clean || null);
       onSaved(clean);
     } catch (e) { console.error(e); }
     finally { setSaving(false); }
   }
 
   return (
-    <ModalShell title={`Enlace de ${biz.name}`} color={biz.color ?? undefined} onClose={onClose}>
-      {!biz.url && <p className="text-xs text-amber-300/80">Todavía no configuraste el enlace de este negocio.</p>}
+    <ModalShell title={`Enlace · ${link.label}`} onClose={onClose}>
+      {!link.url && <p className="text-xs text-amber-300/80">Todavía no configuraste este enlace.</p>}
       <div>
-        <label className="text-xs text-plata-400 mb-1 block">URL del sistema / sitio</label>
+        <label className="text-xs text-plata-400 mb-1 block">URL de {link.label}</label>
         <input autoFocus value={url} onChange={e => setUrl(e.target.value)}
           placeholder="https://..." className="pm-input" />
       </div>

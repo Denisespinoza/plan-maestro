@@ -123,7 +123,7 @@ export default function Layout({ currentPage, onNavigate, children, isAdmin = fa
           ))}
 
           {/* Mis negocios */}
-          <BusinessQuickAccess />
+          <BusinessQuickAccess onNavigate={(p) => handleNav(p as Page)} />
         </nav>
 
         {/* Branding at bottom */}
