@@ -408,11 +408,12 @@ function RadarView({ radar, onArchive, onDuplicate, onUpdateMeta }: {
   const prevScores = prevEval ? (scoresCache[prevEval.id] ?? []) : [];
   const prevMetrics = useMemo(() => calcRadarMetrics(prevScores), [prevScores]);
 
-  // Build area color map: display_name → hex color (uses area def color or fallback by key)
+  // Build area color map: display_name → hex color.
+  // Prioridad: color guardado → color del Radar de Vida por key → paleta por índice.
   const areaColorMap = useMemo(() => {
     const m: Record<string, string> = {};
-    areaDefs.forEach(d => {
-      m[d.display_name] = d.color ?? LIFE_RADAR_DEFAULT_COLORS[d.area_key] ?? '#6B7280';
+    areaDefs.forEach((d, i) => {
+      m[d.display_name] = d.color ?? LIFE_RADAR_DEFAULT_COLORS[d.area_key] ?? RADAR_AREA_PALETTE[i % RADAR_AREA_PALETTE.length];
     });
     return m;
   }, [areaDefs]);
@@ -1173,7 +1174,7 @@ function EditAreasModal({ radar, areaDefs, isFixed, onSave, onClose }: {
         <div className="p-5 flex flex-col gap-3">
           {!isFixed && <p className="text-xs text-plata-500">{activeDefs.length} áreas activas · mín. 3, máx. 16</p>}
           {defs.filter(d => d.is_active).map((d, idx) => {
-            const defColor = d.color ?? LIFE_RADAR_DEFAULT_COLORS[d.area_key] ?? '#6B7280';
+            const defColor = d.color ?? LIFE_RADAR_DEFAULT_COLORS[d.area_key] ?? RADAR_AREA_PALETTE[idx % RADAR_AREA_PALETTE.length];
             return (
               <div key={d.id} className="flex items-center gap-2">
                 {!isFixed && <GripVertical size={14} className="text-plata-700 shrink-0" />}
