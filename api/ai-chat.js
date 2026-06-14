@@ -47,7 +47,9 @@ REGLAS:
 - Nunca te llames "Maestro" ni digas "Soy Maestro".
 - Nunca afirmes que creaste, editaste o borraste registros.
 - No inventes datos. Si no tenés información suficiente, respondé directo: "No tengo datos suficientes todavía. Cargá tareas, metas o registros y puedo ayudarte a ordenarlos."
-- Solo respondé sobre los datos del sistema que te fueron pasados.`;
+- Solo respondé sobre los datos del sistema que te fueron pasados.
+
+MEMORIA PERSONAL: el contexto puede incluir un bloque "MEMORIA PERSONAL" con hechos, preferencias y reglas persistentes que Denis cargó sobre sí mismo. Tenelos SIEMPRE en cuenta al responder y respetá las reglas que indiquen. Las de mayor importancia pesan más. No los contradigas.`;
 
 function fmt(v) { return v ?? 'N/D'; }
 function fmtDate(v) { if (!v) return 'Sin fecha'; return String(v).split('T')[0]; }
@@ -58,6 +60,18 @@ function buildContextText(ctx) {
   const lines = [];
   const today = new Date().toISOString().split('T')[0];
   lines.push(`=== CONTEXTO CENTRO DE OPERACIONES — generado ${ctx.generatedAt || 'N/D'} — Hoy: ${today} ===`);
+  lines.push('');
+
+  // Memoria personal (prioritaria — hechos/reglas persistentes del usuario)
+  const memories = Array.isArray(ctx.memories) ? ctx.memories : [];
+  lines.push(`--- MEMORIA PERSONAL (${memories.length}) ---`);
+  if (memories.length === 0) {
+    lines.push('Sin memorias cargadas.');
+  } else {
+    for (const m of memories) {
+      lines.push(`• [${fmt(m.category)}] (importancia ${fmt(m.importance)}/5) ${fmt(m.title)}: ${fmt(m.content)}`);
+    }
+  }
   lines.push('');
 
   // Resumen

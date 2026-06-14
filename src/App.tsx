@@ -12,6 +12,7 @@ import MapaDeFuturo from './pages/MapaDeFuturo';
 import Disciplina from './pages/Disciplina';
 import RadarPage from './pages/Radar';
 import Bitacora from './pages/Bitacora';
+import MemoriaIA from './pages/MemoriaIA';
 import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
 import { Crown } from 'lucide-react';
@@ -47,6 +48,7 @@ function AppContent() {
       case 'radar':        return <RadarPage />;
       case 'bitacora':     return <Bitacora openCierreSignal={cierreSignal} />;
       case 'ai-assistant': return <AiAssistant />;
+      case 'memoria-ia':   return <MemoriaIA />;
       case 'users':        return isAdmin ? <UserManagement /> : <Hoy />;
       default:             return <Hoy />;
     }

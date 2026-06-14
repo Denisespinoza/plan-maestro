@@ -350,6 +350,7 @@ export interface PmAiContext {
   businessTimeToday: PmAiContextBusinessTime[];
   visions: PmAiContextVision[];
   journal: PmAiContextJournal | null;
+  memories: Array<{ category: string; title: string; content: string; importance: number }>;
 }
 
 export async function getPmAiContext(): Promise<PmAiContext> {
@@ -444,6 +445,13 @@ export async function getPmAiContext(): Promise<PmAiContext> {
     };
   } catch { journal = null; }
 
+  // Memoria IA: hechos persistentes activos del usuario
+  let memories: Array<{ category: string; title: string; content: string; importance: number }> = [];
+  try {
+    const mem = await getActiveAiMemories();
+    memories = mem.map(m => ({ category: m.category, title: m.title, content: m.content, importance: m.importance }));
+  } catch { memories = []; }
+
   return {
     generatedAt: new Date().toISOString(),
     totalTasks: tasks.length,
@@ -459,6 +467,7 @@ export async function getPmAiContext(): Promise<PmAiContext> {
     businessTimeToday,
     visions,
     journal,
+    memories,
   };
 }
 
@@ -1554,4 +1563,84 @@ export async function getJournalContext(): Promise<JournalContext> {
     recentClosings: all.filter(e => e.type === 'cierre_diario').slice(0, 7),
     recentLessons: all.filter(e => e.type === 'leccion').slice(0, 10),
   };
+}
+
+// ─── MEMORIA IA ───────────────────────────────────────────────────────────────
+
+export type MemoryCategory =
+  | 'general' | 'preferencias' | 'objetivos' | 'salud' | 'negocios'
+  | 'familia' | 'reglas' | 'contexto';
+
+export interface AiMemory {
+  id: string;
+  user_id: string;
+  category: string;
+  title: string;
+  content: string;
+  importance: number;   // 1–5
+  source: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const MEMORY_CATEGORIES: Array<{ key: MemoryCategory; label: string }> = [
+  { key: 'general',      label: 'General' },
+  { key: 'preferencias', label: 'Preferencias' },
+  { key: 'objetivos',    label: 'Objetivos' },
+  { key: 'salud',        label: 'Salud' },
+  { key: 'negocios',     label: 'Negocios' },
+  { key: 'familia',      label: 'Familia' },
+  { key: 'reglas',       label: 'Reglas' },
+  { key: 'contexto',     label: 'Contexto' },
+];
+
+export async function getAiMemories(): Promise<AiMemory[]> {
+  const { data, error } = await supabase
+    .from('pm_ai_memory')
+    .select('*')
+    .order('importance', { ascending: false })
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as AiMemory[];
+}
+
+export async function getActiveAiMemories(): Promise<AiMemory[]> {
+  const { data, error } = await supabase
+    .from('pm_ai_memory')
+    .select('*')
+    .eq('is_active', true)
+    .order('importance', { ascending: false })
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as AiMemory[];
+}
+
+export async function createAiMemory(
+  m: Omit<AiMemory, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+): Promise<AiMemory> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+  const { data, error } = await supabase
+    .from('pm_ai_memory')
+    .insert({ ...m, user_id: user.id })
+    .select().single();
+  if (error) throw error;
+  return data as AiMemory;
+}
+
+export async function updateAiMemory(
+  id: string, m: Partial<Omit<AiMemory, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+): Promise<void> {
+  const { error } = await supabase.from('pm_ai_memory').update(m).eq('id', id);
+  if (error) throw error;
+}
+
+export async function setAiMemoryActive(id: string, isActive: boolean): Promise<void> {
+  await updateAiMemory(id, { is_active: isActive });
+}
+
+export async function deleteAiMemory(id: string): Promise<void> {
+  const { error } = await supabase.from('pm_ai_memory').delete().eq('id', id);
+  if (error) throw error;
 }
