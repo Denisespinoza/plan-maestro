@@ -15,8 +15,25 @@ Cuando alguien te pregunte cuál es tu origen o de dónde saliste, respondé exa
 
 USUARIO: Denis Espinoza, que además es tu creador. Referite a él como "Denis", "Denis Espinoza" o "vos". No uses formas de tratamiento serviles como "mi maestro", "jefe supremo" ni "amo".
 
-Tu función: ayudar a Denis a revisar tareas, ordenar prioridades, analizar metas, detectar atrasos, revisar proyectos, medir disciplina, revisar el Radar, revisar el tiempo planificado/trabajado por negocio, conectar acciones con la visión, tomar decisiones, organizar el día, detectar qué está urgente y resumir el estado del sistema.
-Tenés acceso de SOLO LECTURA a todos los datos de CEO DENIS: tareas, metas, proyectos, radares, hábitos (disciplina) y tiempo por negocio.
+Tu función: ayudar a Denis a revisar tareas, ordenar prioridades, analizar metas, detectar atrasos, revisar proyectos, medir disciplina, revisar el Radar, revisar la Brújula (visiones), revisar la Bitácora (diario/ideas/decisiones/planes/lecciones/cierre), revisar el tiempo planificado/trabajado por negocio, tomar decisiones, organizar el día, detectar qué está urgente y resumir el estado del sistema.
+Tenés acceso de SOLO LECTURA a todos los datos de CEO DENIS: tareas (Hoy/Kanban), metas y proyectos (Objetivos), visiones (Brújula), hábitos (Disciplina), radares (Radar), bitácora (diario/ideas/decisiones/planes/lecciones/cierre) y tiempo por negocio.
+
+USO DE DATOS — REGLA CRÍTICA:
+- El contexto que recibís contiene los datos REALES de Denis. Usalos siempre: nombres reales de tareas/metas/hábitos/áreas/ideas, fechas reales, estados, prioridades, puntajes y cantidades.
+- Si una sección TIENE datos, respondé con esos datos concretos. NUNCA respondas de forma genérica como "podrías revisar tus metas" o "no tengo datos suficientes" cuando el contexto sí tiene datos de esa sección.
+- Si una sección puntual NO tiene datos, decilo específicamente: "No encontré evaluaciones cargadas en Radar todavía", "No encontré entradas en Bitácora todavía", etc. No mezcles: la falta de datos en una sección no significa falta de datos en todo el sistema.
+- No inventes datos. Si algo no está en el contexto, no lo afirmes.
+
+FORMATO PARA RESÚMENES / "¿qué hago primero?" / "¿cómo estoy?":
+Respondé con esta estructura:
+1. Prioridad principal: (lo más importante a atacar ahora, con el dato real)
+2. Riesgos detectados: (atrasos, hábitos fallados, brechas de Radar, decisiones sin revisar, día sin cerrar)
+3. Próximas 3 acciones recomendadas: (concretas, con nombres reales)
+4. Datos usados: (qué secciones miraste)
+
+CRITERIO DE PRIORIDAD EN RADAR: 1) mayor brecha objetivo-actual; 2) si empatan, menor puntaje actual; 3) si siguen empatando, estado crítico o en riesgo.
+
+MODO SOLO LECTURA: podés analizar y recomendar, pero todavía NO podés crear, editar ni borrar nada. Si Denis te pide modificar algo, respondé: "Puedo analizar estos datos, pero todavía no tengo permiso para modificarlos."
 
 ACCESO A CEO MODELTEX: No tenés conexión con la app operativa "CEO Modeltex" (pedidos, clientes, cobranzas, finanzas, inventario). Esos datos NO están disponibles en este sistema. Si Denis te pregunta por pedidos, cobranzas, clientes o cualquier dato de Modeltex, respondé con claridad: "No tengo acceso a los datos de CEO Modeltex desde acá. Este sistema (CEO DENIS) maneja tu planificación personal: tareas, metas, proyectos, radar, disciplina y tiempo por negocio." Lo único que sí podés ver de los negocios MODELTEX/MOLDEY son las tareas vinculadas y el tiempo planificado/trabajado que Denis cargó acá.
 
@@ -90,7 +107,9 @@ function buildContextText(ctx) {
   const all = Array.isArray(ctx.allTasks) ? ctx.allTasks : [];
   lines.push(`--- TODAS LAS TAREAS (${all.length}) ---`);
   for (const t of all) {
-    lines.push(`[${fmt(t.status)}] [${fmt(t.area)}] ${fmt(t.title)} | P:${fmt(t.priority)} | Fecha: ${fmtDate(t.due_date)}${t.is_mit ? ' ★MIT' : ''}${t.goal_id ? ` | Meta: ${t.goal_id}` : ''}`);
+    const colInfo = t.column_key ? ` | Columna: ${t.column_key}` : '';
+    const bizInfo = t.business_key ? ` | Negocio: ${String(t.business_key).toUpperCase()}` : '';
+    lines.push(`[${fmt(t.status)}] [${fmt(t.area)}] ${fmt(t.title)} | P:${fmt(t.priority)} | Fecha: ${fmtDate(t.due_date)}${t.is_mit ? ' ★MIT' : ''}${bizInfo}${colInfo}${t.goal_id ? ` | Meta: ${t.goal_id}` : ''}`);
   }
   lines.push('');
 
@@ -164,6 +183,39 @@ function buildContextText(ctx) {
     for (const b of bt) {
       const diff = (b.worked_minutes ?? 0) - (b.planned_minutes ?? 0);
       lines.push(`• ${fmt(b.name)}: planificado ${b.planned_minutes}min, trabajado ${b.worked_minutes}min (${diff >= 0 ? '+' : ''}${diff}min)`);
+    }
+  }
+  lines.push('');
+
+  // Brújula — visiones
+  const visions = Array.isArray(ctx.visions) ? ctx.visions : [];
+  lines.push(`--- BRÚJULA / VISIONES (${visions.length}) ---`);
+  if (visions.length === 0) {
+    lines.push('Sin visiones cargadas en Brújula.');
+  } else {
+    for (const v of visions) {
+      lines.push(`• [${fmt(v.area)}] ${fmt(v.title)} | Plazo: ${fmt(v.timeframe)} | Estado: ${fmt(v.status)} | Prioridad: ${fmt(v.priority)} | Fecha objetivo: ${fmtDate(v.target_date)}${v.description ? ` | ${v.description}` : ''}`);
+    }
+  }
+  lines.push('');
+
+  // Bitácora
+  const j = ctx.journal;
+  lines.push('--- BITÁCORA ---');
+  if (!j) {
+    lines.push('Sin entradas en Bitácora todavía.');
+  } else {
+    lines.push(`Cierre de hoy: ${j.cierreTodayDone ? 'SÍ cerrado' : 'NO cerrado todavía'}`);
+    lines.push(`Ideas activas (${j.activeIdeas.length}): ${j.activeIdeas.length ? j.activeIdeas.map(i => `${i.title}${i.status ? ` [${i.status}]` : ''}`).join(' · ') : 'ninguna'}`);
+    lines.push(`Decisiones en revisión (${j.decisionsInReview.length}): ${j.decisionsInReview.length ? j.decisionsInReview.map(d => `${d.title} (${fmtDate(d.entry_date)})`).join(' · ') : 'ninguna'}`);
+    lines.push(`Planes activos (${j.activePlans.length}): ${j.activePlans.length ? j.activePlans.map(p => p.title).join(' · ') : 'ninguno'}`);
+    lines.push(`Lecciones recientes (${j.recentLessons.length}): ${j.recentLessons.length ? j.recentLessons.map(l => l.title).join(' · ') : 'ninguna'}`);
+    lines.push(`Cierres recientes (${j.recentClosings.length}): ${j.recentClosings.length ? j.recentClosings.map(c => fmtDate(c.entry_date)).join(', ') : 'ninguno'}`);
+    if (Array.isArray(j.recentEntries) && j.recentEntries.length) {
+      lines.push('Últimas entradas:');
+      for (const e of j.recentEntries) {
+        lines.push(`  - [${fmt(e.type)}] ${fmt(e.title)} (${fmtDate(e.entry_date)})${e.status ? ` [${e.status}]` : ''}`);
+      }
     }
   }
   lines.push('');

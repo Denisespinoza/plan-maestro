@@ -16,11 +16,11 @@ import {
 } from '../lib/planMaestro';
 
 const QUICK_PROMPTS = [
-  { label: '¿Qué hago hoy?',        prompt: '¿Qué debería hacer hoy según mis tareas y metas actuales?' },
-  { label: 'Metas atrasadas',       prompt: '¿Qué metas están atrasadas o en riesgo de no cumplirse?' },
-  { label: 'Área más urgente',      prompt: '¿Qué área (ModelTex, Moldey, Personal, Sistemas) necesita más atención ahora?' },
-  { label: 'Resumen del sistema',   prompt: 'Dame un resumen ejecutivo del estado actual: tareas, metas y proyectos.' },
-  { label: 'Inbox acumulado',       prompt: '¿Cuántas tareas tengo en Inbox sin procesar? ¿Qué patrones ves?' },
+  { label: '¿Qué hago hoy?',        prompt: '¿Qué debería hacer hoy según mis tareas, prioridades y lo que está vencido?' },
+  { label: 'Objetivos atrasados',   prompt: '¿Qué objetivos (metas y proyectos) están atrasados o en riesgo?' },
+  { label: 'Revisá mi Radar',       prompt: 'Revisá mi Radar y decime qué área tengo que mejorar primero y por qué.' },
+  { label: 'Resumen del sistema',   prompt: 'Dame un resumen del sistema completo: prioridad principal, riesgos y próximas 3 acciones.' },
+  { label: 'Cómo voy con hábitos',  prompt: '¿Cómo voy con mi disciplina hoy? ¿Qué hábito estoy fallando más?' },
 ];
 
 const WELCOME: AiChatMessage = {

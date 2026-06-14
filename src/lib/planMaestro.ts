@@ -315,6 +315,26 @@ export interface PmAiContextBusinessTime {
   worked_minutes: number;
 }
 
+export interface PmAiContextVision {
+  title: string;
+  area: string;
+  timeframe: string;
+  status: string;
+  priority: string;
+  target_date: string | null;
+  description: string | null;
+}
+
+export interface PmAiContextJournal {
+  recentEntries: Array<{ type: string; title: string; entry_date: string; status: string | null; area: string | null }>;
+  activeIdeas: Array<{ title: string; status: string | null; area: string | null; priority: string | null }>;
+  decisionsInReview: Array<{ title: string; entry_date: string }>;
+  activePlans: Array<{ title: string; entry_date: string }>;
+  recentLessons: Array<{ title: string; entry_date: string }>;
+  recentClosings: Array<{ entry_date: string; title: string }>;
+  cierreTodayDone: boolean;
+}
+
 export interface PmAiContext {
   generatedAt: string;
   totalTasks: number;
@@ -328,6 +348,8 @@ export interface PmAiContext {
   radars: PmAiContextRadar[];
   habits: PmAiContextHabit[];
   businessTimeToday: PmAiContextBusinessTime[];
+  visions: PmAiContextVision[];
+  journal: PmAiContextJournal | null;
 }
 
 export async function getPmAiContext(): Promise<PmAiContext> {
@@ -392,6 +414,36 @@ export async function getPmAiContext(): Promise<PmAiContext> {
     });
   } catch { businessTimeToday = []; }
 
+  // Brújula: visiones
+  let visions: PmAiContextVision[] = [];
+  try {
+    const vs = await getFutureVisions();
+    visions = vs.map(v => ({
+      title: v.title,
+      area: visionAreaLabel(v),
+      timeframe: v.timeframe,
+      status: v.status,
+      priority: v.priority,
+      target_date: v.target_date,
+      description: v.description,
+    }));
+  } catch { visions = []; }
+
+  // Bitácora: resumen
+  let journal: PmAiContextJournal | null = null;
+  try {
+    const jc = await getJournalContext();
+    journal = {
+      recentEntries: jc.recentEntries.slice(0, 15).map(e => ({ type: e.type, title: e.title, entry_date: e.entry_date, status: e.status, area: e.area })),
+      activeIdeas: jc.activeIdeas.map(e => ({ title: e.title, status: e.status, area: e.area, priority: e.priority })),
+      decisionsInReview: jc.decisionsInReview.map(e => ({ title: e.title, entry_date: e.entry_date })),
+      activePlans: jc.activePlans.map(e => ({ title: e.title, entry_date: e.entry_date })),
+      recentLessons: jc.recentLessons.map(e => ({ title: e.title, entry_date: e.entry_date })),
+      recentClosings: jc.recentClosings.map(e => ({ entry_date: e.entry_date, title: e.title })),
+      cierreTodayDone: jc.recentClosings.some(e => e.entry_date === today),
+    };
+  } catch { journal = null; }
+
   return {
     generatedAt: new Date().toISOString(),
     totalTasks: tasks.length,
@@ -405,6 +457,8 @@ export async function getPmAiContext(): Promise<PmAiContext> {
     radars,
     habits,
     businessTimeToday,
+    visions,
+    journal,
   };
 }
 
