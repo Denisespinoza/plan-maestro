@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Star, CheckCircle2, Circle, Calendar, AlertCircle, Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Star, CheckCircle2, Circle, Calendar, AlertCircle, Plus, Pencil, Trash2, Loader2, MoonStar } from 'lucide-react';
 import {
   type Task,
   type Area,
@@ -26,7 +26,7 @@ interface TaskFormData {
 
 const EMPTY_FORM: TaskFormData = { title: '', area: 'modeltex', priority: 'alta', notes: '', is_mit: true };
 
-export default function Hoy() {
+export default function Hoy({ onCerrarDia }: { onCerrarDia?: () => void }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -96,12 +96,22 @@ export default function Hoy() {
               {mitTasks.length} MIT · {otherTasks.length} tareas adicionales
             </p>
           </div>
-          <button
-            onClick={() => setShowForm(s => !s)}
-            className="flex items-center gap-2 px-4 py-2 bg-bordo-600 hover:bg-bordo-500 text-white rounded-xl font-medium text-sm transition-colors shadow-pm"
-          >
-            <Plus size={16} /> Nueva tarea
-          </button>
+          <div className="flex items-center gap-2">
+            {onCerrarDia && (
+              <button
+                onClick={onCerrarDia}
+                className="flex items-center gap-2 px-4 py-2 border border-dorado-500/40 text-dorado-300 hover:bg-dorado-900/30 rounded-xl font-medium text-sm transition-colors"
+              >
+                <MoonStar size={16} /> Cerrar día
+              </button>
+            )}
+            <button
+              onClick={() => setShowForm(s => !s)}
+              className="flex items-center gap-2 px-4 py-2 bg-bordo-600 hover:bg-bordo-500 text-white rounded-xl font-medium text-sm transition-colors shadow-pm"
+            >
+              <Plus size={16} /> Nueva tarea
+            </button>
+          </div>
         </div>
       </div>
 

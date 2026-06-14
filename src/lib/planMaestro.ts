@@ -1323,3 +1323,115 @@ export async function getBusinessDaySummary(businessKey: string, workDate: strin
     pendingTasks: pending,
   };
 }
+
+// ─── BITÁCORA ───────────────────────────────────────────────────────────────
+
+export type JournalType = 'diario' | 'idea' | 'decision' | 'plan' | 'leccion' | 'cierre_diario';
+
+export interface JournalEntry {
+  id: string;
+  user_id: string;
+  type: JournalType;
+  title: string;
+  content: string | null;
+  entry_date: string;
+  status: string | null;
+  area: string | null;
+  priority: string | null;
+  related_business: string | null;
+  mood: string | null;
+  energy_level: number | null;
+  focus_level: number | null;
+  tags: string[] | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export const JOURNAL_TYPE_CONFIG: Record<JournalType, { label: string; color: string }> = {
+  diario:        { label: 'Diario',        color: '#3B82F6' },
+  idea:          { label: 'Idea',          color: '#B8922A' },
+  decision:      { label: 'Decisión',      color: '#8B1A2E' },
+  plan:          { label: 'Plan',          color: '#8B5CF6' },
+  leccion:       { label: 'Lección',       color: '#16A34A' },
+  cierre_diario: { label: 'Cierre diario', color: '#D97706' },
+};
+
+export async function getJournalEntries(type?: JournalType): Promise<JournalEntry[]> {
+  let q = supabase.from('pm_journal_entries').select('*').order('entry_date', { ascending: false }).order('created_at', { ascending: false });
+  if (type) q = q.eq('type', type);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as JournalEntry[];
+}
+
+export async function createJournalEntry(
+  e: Omit<JournalEntry, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+): Promise<JournalEntry> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+  const { data, error } = await supabase
+    .from('pm_journal_entries')
+    .insert({ ...e, user_id: user.id })
+    .select().single();
+  if (error) throw error;
+  return data as JournalEntry;
+}
+
+export async function updateJournalEntry(
+  id: string, e: Partial<Omit<JournalEntry, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+): Promise<void> {
+  const { error } = await supabase.from('pm_journal_entries').update(e).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteJournalEntry(id: string): Promise<void> {
+  const { error } = await supabase.from('pm_journal_entries').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Cierre diario: uno por fecha. Devuelve el de la fecha dada si existe.
+export async function getCierreForDate(date: string): Promise<JournalEntry | null> {
+  const { data } = await supabase
+    .from('pm_journal_entries')
+    .select('*')
+    .eq('type', 'cierre_diario')
+    .eq('entry_date', date)
+    .maybeSingle();
+  return (data as JournalEntry) ?? null;
+}
+
+// Crea o actualiza el cierre del día (evita duplicados por fecha)
+export async function upsertCierre(
+  date: string,
+  fields: Omit<JournalEntry, 'id' | 'user_id' | 'type' | 'entry_date' | 'created_at' | 'updated_at'>
+): Promise<JournalEntry> {
+  const existing = await getCierreForDate(date);
+  if (existing) {
+    await updateJournalEntry(existing.id, fields);
+    return { ...existing, ...fields } as JournalEntry;
+  }
+  return createJournalEntry({ ...fields, type: 'cierre_diario', entry_date: date });
+}
+
+// ── Contexto para el Asistente IA (solo lectura) ──
+export interface JournalContext {
+  recentEntries: JournalEntry[];
+  activeIdeas: JournalEntry[];
+  decisionsInReview: JournalEntry[];
+  activePlans: JournalEntry[];
+  recentClosings: JournalEntry[];
+  recentLessons: JournalEntry[];
+}
+
+export async function getJournalContext(): Promise<JournalContext> {
+  const all = await getJournalEntries();
+  return {
+    recentEntries: all.slice(0, 20),
+    activeIdeas: all.filter(e => e.type === 'idea' && !['descartada', 'convertida'].includes(e.status ?? '')),
+    decisionsInReview: all.filter(e => e.type === 'decision' && e.status === 'en_revision'),
+    activePlans: all.filter(e => e.type === 'plan' && e.status === 'activo'),
+    recentClosings: all.filter(e => e.type === 'cierre_diario').slice(0, 7),
+    recentLessons: all.filter(e => e.type === 'leccion').slice(0, 10),
+  };
+}

@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useTheme } from '../lib/theme';
 import {
   Sun, Moon, Menu, X, LogOut, Crown, Shield,
-  CalendarCheck, LayoutDashboard, Target, Bot, Compass, Flame, Radar,
+  CalendarCheck, LayoutDashboard, Target, Bot, Compass, Flame, Radar, BookText,
 } from 'lucide-react';
 import BusinessQuickAccess from './BusinessQuickAccess';
 
-export type Page = 'hoy' | 'kanban' | 'objetivos' | 'metas' | 'proyectos' | 'mapa-futuro' | 'disciplina' | 'radar' | 'ai-assistant' | 'users';
+export type Page = 'hoy' | 'kanban' | 'objetivos' | 'metas' | 'proyectos' | 'mapa-futuro' | 'disciplina' | 'radar' | 'bitacora' | 'ai-assistant' | 'users';
 
 interface LayoutProps {
   currentPage: Page;
@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { page: 'mapa-futuro',  label: 'Brújula',       icon: Compass },
   { page: 'disciplina',   label: 'Disciplina',    icon: Flame },
   { page: 'radar',        label: 'Radar',         icon: Radar },
+  { page: 'bitacora',     label: 'Bitácora',      icon: BookText },
   { page: 'ai-assistant', label: 'Asistente IA',  icon: Bot },
   { page: 'users',        label: 'Usuarios',      icon: Shield, adminOnly: true },
 ];

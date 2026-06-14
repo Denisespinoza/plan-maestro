@@ -11,6 +11,7 @@ import AiAssistant from './pages/AiAssistant';
 import MapaDeFuturo from './pages/MapaDeFuturo';
 import Disciplina from './pages/Disciplina';
 import RadarPage from './pages/Radar';
+import Bitacora from './pages/Bitacora';
 import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
 import { Crown } from 'lucide-react';
@@ -18,6 +19,7 @@ import { Crown } from 'lucide-react';
 function AppContent() {
   const { user, profile, isAdmin, loading, signOut } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('hoy');
+  const [cierreSignal, setCierreSignal] = useState(0);
 
   if (loading) {
     return (
@@ -35,7 +37,7 @@ function AppContent() {
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'hoy':          return <Hoy />;
+      case 'hoy':          return <Hoy onCerrarDia={() => { setCierreSignal(s => s + 1); setCurrentPage('bitacora'); }} />;
       case 'kanban':       return <Kanban />;
       case 'objetivos':    return <Objetivos />;
       case 'metas':        return <Metas />;
@@ -43,6 +45,7 @@ function AppContent() {
       case 'mapa-futuro':  return <MapaDeFuturo />;
       case 'disciplina':   return <Disciplina />;
       case 'radar':        return <RadarPage />;
+      case 'bitacora':     return <Bitacora openCierreSignal={cierreSignal} />;
       case 'ai-assistant': return <AiAssistant />;
       case 'users':        return isAdmin ? <UserManagement /> : <Hoy />;
       default:             return <Hoy />;
