@@ -288,6 +288,7 @@ function TaskModal({ biz, onClose }: { biz: Business; onClose: () => void }) {
         project_id: null,
         goal_id: null,
         business_key: biz.key,
+        column_key: null,
       });
       setDone(true);
       setTimeout(onClose, 900);

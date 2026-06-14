@@ -50,6 +50,7 @@ export interface Task {
   due_date: string | null;
   position: number;
   business_key: string | null;  // vínculo opcional a un negocio (modeltex/moldey)
+  column_key: string | null;    // columna custom del Kanban; null = vive en su status base
   created_at: string;
   updated_at: string;
 }
@@ -218,6 +219,73 @@ export async function deleteTask(id: string): Promise<void> {
 
 export async function moveTask(id: string, newStatus: TaskStatus): Promise<void> {
   await updateTask(id, { status: newStatus });
+}
+
+// ─── KANBAN COLUMNS ────────────────────────────────────────────────────────────
+
+export interface KanbanColumn {
+  id: string;
+  user_id: string;
+  name: string;
+  key: string;
+  color: string | null;
+  sort_order: number;
+  is_system: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Columnas de sistema (viven en código, usan pm_tasks.status)
+export const SYSTEM_COLUMNS: Array<{ key: TaskStatus; label: string; color: string }> = [
+  { key: 'inbox',     label: 'Inbox',     color: '#868E96' },
+  { key: 'hoy',       label: 'Hoy',       color: '#B8922A' },
+  { key: 'en_curso',  label: 'En curso',  color: '#8B1A2E' },
+  { key: 'esperando', label: 'Esperando', color: '#D97706' },
+  { key: 'hecho',     label: 'Hecho',     color: '#16A34A' },
+];
+
+export async function getKanbanColumns(): Promise<KanbanColumn[]> {
+  const { data, error } = await supabase
+    .from('pm_kanban_columns')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createKanbanColumn(name: string, color: string | null, sortOrder: number): Promise<KanbanColumn> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+  const key = `col_${Date.now()}`;
+  const { data, error } = await supabase
+    .from('pm_kanban_columns')
+    .insert({ user_id: user.id, name: name.trim(), key, color, sort_order: sortOrder, is_system: false, is_active: true })
+    .select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateKanbanColumn(id: string, data: Partial<Pick<KanbanColumn, 'name' | 'color' | 'sort_order' | 'is_active'>>): Promise<void> {
+  const { error } = await supabase.from('pm_kanban_columns').update(data).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteKanbanColumn(id: string): Promise<void> {
+  const { error } = await supabase.from('pm_kanban_columns').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Mueve una tarea a una columna de SISTEMA (status base, limpia column_key)
+export async function moveTaskToSystemColumn(id: string, status: TaskStatus): Promise<void> {
+  await updateTask(id, { status, column_key: null });
+}
+
+// Mueve una tarea a una columna CUSTOM (status neutro inbox + column_key)
+export async function moveTaskToCustomColumn(id: string, columnKey: string): Promise<void> {
+  await updateTask(id, { column_key: columnKey, status: 'inbox' });
 }
 
 // ─── AI CONTEXT ───────────────────────────────────────────────────────────────

@@ -74,6 +74,7 @@ export default function Hoy() {
         project_id: null,
         goal_id: null,
         business_key: null,
+        column_key: null,
       });
       setTasks(prev => [t, ...prev]);
       setForm(EMPTY_FORM);
