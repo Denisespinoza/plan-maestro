@@ -14,6 +14,7 @@ import {
   saveMessage,
   sendAiChat,
 } from '../lib/planMaestro';
+import { parseAiReply, executeAiActions } from '../lib/aiActions';
 
 const QUICK_PROMPTS = [
   { label: '¿Qué hago hoy?',        prompt: '¿Qué debería hacer hoy según mis tareas, prioridades y lo que está vencido?' },
@@ -124,10 +125,20 @@ export default function AiAssistant() {
       const freshCtx = await getPmAiContext();
       setContext(freshCtx);
       const reply = await sendAiChat(next, freshCtx);
-      const final = [...next, { role: 'assistant' as const, content: reply }];
+
+      // ¿La IA devolvió acciones para ejecutar?
+      const parsed = parseAiReply(reply);
+      let finalText = reply;
+      if (parsed) {
+        const results = await executeAiActions(parsed.actions);
+        finalText = [parsed.reply, ...results].filter(Boolean).join('\n');
+        if (!finalText.trim()) finalText = 'Listo.';
+      }
+
+      const final = [...next, { role: 'assistant' as const, content: finalText }];
       setMessages(final);
       if (convId) {
-        try { await saveMessage(convId, 'assistant', reply); } catch (e) { console.error(e); }
+        try { await saveMessage(convId, 'assistant', finalText); } catch (e) { console.error(e); }
         setConversations(prev =>
           prev.map(c => c.id === convId ? { ...c, updated_at: new Date().toISOString() } : c)
             .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
