@@ -6,6 +6,7 @@ export type Area = 'modeltex' | 'moldey' | 'personal' | 'sistemas';
 export type Priority = 'alta' | 'media' | 'baja';
 export type TaskStatus = 'inbox' | 'hoy' | 'en_curso' | 'esperando' | 'hecho';
 export type Timeframe = 'corto' | 'mediano' | 'largo';
+export type ProjectStatus = 'planeado' | 'activo' | 'en_pausa' | 'finalizado' | 'cancelado';
 
 export interface Project {
   id: string;
@@ -14,6 +15,13 @@ export interface Project {
   area: Area;
   description: string | null;
   color: string | null;
+  status: ProjectStatus;
+  priority: Priority;
+  start_date: string | null;
+  target_date: string | null;
+  progress: number;
+  next_step: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +76,14 @@ export const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; d
   alta:  { label: 'Alta',  color: 'text-red-300',    dot: 'bg-red-400' },
   media: { label: 'Media', color: 'text-dorado-300', dot: 'bg-dorado-400' },
   baja:  { label: 'Baja',  color: 'text-plata-400',  dot: 'bg-plata-500' },
+};
+
+export const PROJECT_STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; bg: string; border: string }> = {
+  planeado:   { label: 'Planeado',   color: 'text-plata-300',   bg: 'bg-plata-700/30',   border: 'border-plata-600/40' },
+  activo:     { label: 'Activo',     color: 'text-emerald-300', bg: 'bg-emerald-900/30', border: 'border-emerald-600/40' },
+  en_pausa:   { label: 'En pausa',   color: 'text-amber-300',   bg: 'bg-amber-900/20',   border: 'border-amber-600/40' },
+  finalizado: { label: 'Finalizado', color: 'text-dorado-300',  bg: 'bg-dorado-900/30',  border: 'border-dorado-600/40' },
+  cancelado:  { label: 'Cancelado',  color: 'text-red-300',     bg: 'bg-red-900/20',     border: 'border-red-600/40' },
 };
 
 export const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; bg: string }> = {
