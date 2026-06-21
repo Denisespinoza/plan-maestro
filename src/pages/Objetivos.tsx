@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Target, FolderKanban, TrendingUp, AlertTriangle, CheckCircle2,
-  Loader2, Calendar, ListChecks, Pause,
+  Loader2, Calendar, ListChecks, Pause, AlertCircle,
 } from 'lucide-react';
 import {
   type Goal, type Project, type Task,
@@ -40,9 +40,7 @@ function daysOverdue(date: string): number {
   return Math.floor((t.getTime() - d.getTime()) / 86400000);
 }
 
-function safeProjectStatus(p: Project) {
-  return p.status ?? 'activo';
-}
+function safeProjectStatus(p: Project) { return p.status ?? 'activo'; }
 
 function isProjectOverdue(p: Project): boolean {
   if (!p.target_date) return false;
@@ -65,7 +63,7 @@ export default function Objetivos() {
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Target size={22} className="text-dorado-400" /> Objetivos
           </h1>
-          <p className="text-sm text-plata-400 mt-0.5">Proyectos, metas y tareas conectados en un solo lugar.</p>
+          <p className="text-sm text-plata-400 mt-0.5">Proyectos → Metas → Tareas → Avance</p>
         </div>
       </div>
 
@@ -102,10 +100,10 @@ export default function Objetivos() {
 // ─── DATA HOOK ────────────────────────────────────────────────────────────────
 
 function useObjetivosData() {
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goals, setGoals]       = useState<Goal[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [tasks, setTasks]       = useState<Task[]>([]);
+  const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -123,72 +121,99 @@ function useObjetivosData() {
 // ─── TAB TAREAS ───────────────────────────────────────────────────────────────
 
 function TareasTab() {
-  const { tasks, loading } = useObjetivosData();
+  const { tasks, projects, loading } = useObjetivosData();
 
   const activeTasks = useMemo(() =>
     tasks
       .filter(t => t.status !== 'hecho')
       .sort((a, b) => {
-        // MITs primero, luego por prioridad, luego por fecha
         if (a.is_mit !== b.is_mit) return a.is_mit ? -1 : 1;
         const priOrder = { alta: 0, media: 1, baja: 2 };
-        if (a.priority !== b.priority) return priOrder[a.priority] - priOrder[b.priority];
-        if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
-        if (a.due_date) return -1;
-        if (b.due_date) return 1;
-        return 0;
-      })
-      .slice(0, 50),
+        return priOrder[a.priority] - priOrder[b.priority];
+      }),
     [tasks]
   );
 
   if (loading) return <Loading />;
-  if (activeTasks.length === 0) return <Empty text="No hay tareas activas." sub="Las tareas aparecerán acá desde tu Kanban." />;
+  if (activeTasks.length === 0) return <Empty text="No hay tareas activas." sub="Las tareas de tus proyectos aparecerán acá." />;
 
-  const overdueTasks = activeTasks.filter(t => t.due_date && t.due_date < TODAY);
+  // Group by project
+  const withProject    = activeTasks.filter(t => t.project_id);
+  const withoutProject = activeTasks.filter(t => !t.project_id);
+  const projectsWithTasks = projects.filter(p => withProject.some(t => t.project_id === p.id));
 
   return (
-    <div className="flex flex-col gap-3">
-      {overdueTasks.length > 0 && (
-        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-900/10 border border-red-500/20 rounded-xl px-3 py-2">
-          <AlertTriangle size={13} />
-          {overdueTasks.length} {overdueTasks.length === 1 ? 'tarea atrasada' : 'tareas atrasadas'}
-        </div>
-      )}
-      <div className="flex flex-col gap-2">
-        {activeTasks.map(t => {
-          const area = AREA_CONFIG[t.area];
-          const pri  = PRIORITY_CONFIG[t.priority];
-          const overdue = t.due_date && t.due_date < TODAY;
-          return (
-            <div key={t.id} className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
-              overdue ? 'border-red-500/20 bg-red-900/10' : 'border-plata-700/50 bg-plata-900/60'
-            }`}>
-              {t.is_mit && <span className="text-[9px] font-bold text-dorado-300 bg-dorado-900/40 border border-dorado-500/30 px-1.5 py-0.5 rounded shrink-0">MIT</span>}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{t.title}</p>
-                <div className="flex gap-1.5 flex-wrap mt-0.5">
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${area.bg} ${area.color} ${area.border}`}>{area.label}</span>
-                  <span className={`text-[10px] font-medium ${pri.color}`}>● {pri.label}</span>
-                  {t.due_date && (
-                    <span className={`text-[10px] ${overdue ? 'text-red-400' : 'text-plata-500'}`}>
-                      {overdue ? '⚠' : '📅'} {t.due_date}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${
-                t.status === 'hoy' ? 'bg-dorado-900/40 text-dorado-300'
-                : t.status === 'en_curso' ? 'bg-bordo-900/40 text-bordo-300'
-                : t.status === 'esperando' ? 'bg-amber-900/30 text-amber-300'
-                : 'bg-plata-700/40 text-plata-300'
-              }`}>
-                {t.status === 'hoy' ? 'Hoy' : t.status === 'en_curso' ? 'En curso' : t.status === 'esperando' ? 'Esperando' : 'Inbox'}
-              </span>
+    <div className="flex flex-col gap-5">
+      {projectsWithTasks.map(p => {
+        const ptasks = withProject.filter(t => t.project_id === p.id);
+        const area   = AREA_CONFIG[p.area] ?? AREA_CONFIG['personal'];
+        return (
+          <section key={p.id}>
+            <div className="flex items-center gap-2 mb-2">
+              <FolderKanban size={13} className="text-dorado-400 shrink-0" />
+              <span className="text-sm font-bold text-white">{p.name}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 ${area.bg} ${area.color} ${area.border}`}>{area.label}</span>
+              <span className="text-[10px] text-plata-500 bg-plata-800/60 px-1.5 py-0.5 rounded-full shrink-0">{ptasks.length}</span>
+              <div className="flex-1 h-px bg-plata-700/40" />
             </div>
-          );
-        })}
+            <div className="flex flex-col gap-1.5">
+              {ptasks.map(t => <TaskRow key={t.id} task={t} />)}
+            </div>
+          </section>
+        );
+      })}
+
+      {withoutProject.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle size={13} className="text-amber-400 shrink-0" />
+            <span className="text-sm font-bold text-amber-300">Sin proyecto</span>
+            <span className="text-[10px] text-plata-500 bg-plata-800/60 px-1.5 py-0.5 rounded-full shrink-0">{withoutProject.length}</span>
+            <div className="flex-1 h-px bg-plata-700/40" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {withoutProject.slice(0, 20).map(t => <TaskRow key={t.id} task={t} />)}
+            {withoutProject.length > 20 && (
+              <p className="text-xs text-plata-500 pl-2">+{withoutProject.length - 20} más sin proyecto</p>
+            )}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function TaskRow({ task }: { task: Task }) {
+  const area    = AREA_CONFIG[task.area] ?? AREA_CONFIG['personal'];
+  const pri     = PRIORITY_CONFIG[task.priority];
+  const overdue = task.due_date && task.due_date < TODAY;
+  return (
+    <div className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 ${
+      overdue ? 'border-red-500/20 bg-red-900/10' : 'border-plata-700/50 bg-plata-900/60'
+    }`}>
+      {task.is_mit && (
+        <span className="text-[9px] font-bold text-dorado-300 bg-dorado-900/40 border border-dorado-500/30 px-1.5 py-0.5 rounded shrink-0">MIT</span>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-white truncate">{task.title}</p>
+        <div className="flex gap-1.5 flex-wrap mt-0.5">
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${area.bg} ${area.color} ${area.border}`}>{area.label}</span>
+          <span className={`text-[10px] font-medium ${pri.color}`}>● {pri.label}</span>
+          {task.due_date && (
+            <span className={`text-[10px] ${overdue ? 'text-red-400' : 'text-plata-500'}`}>
+              {overdue ? '⚠' : '📅'} {task.due_date}
+            </span>
+          )}
+        </div>
       </div>
+      <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${
+        task.status === 'hoy'      ? 'bg-dorado-900/40 text-dorado-300' :
+        task.status === 'en_curso' ? 'bg-bordo-900/40 text-bordo-300' :
+        task.status === 'esperando'? 'bg-amber-900/30 text-amber-300' :
+                                     'bg-plata-700/40 text-plata-300'
+      }`}>
+        {task.status === 'hoy' ? 'Hoy' : task.status === 'en_curso' ? 'En curso' : task.status === 'esperando' ? 'Esperando' : 'Inbox'}
+      </span>
     </div>
   );
 }
@@ -198,91 +223,111 @@ function TareasTab() {
 function AvanceTab() {
   const { goals, projects, tasks, loading } = useObjetivosData();
 
-  const stats = useMemo(() => {
-    // Proyectos
-    const projActive    = projects.filter(p => safeProjectStatus(p) === 'activo');
-    const projPaused    = projects.filter(p => safeProjectStatus(p) === 'en_pausa');
-    const projFinished  = projects.filter(p => safeProjectStatus(p) === 'finalizado');
-    const projOverdue   = projects.filter(isProjectOverdue);
-    const projAvgProgress = projects.length > 0
-      ? Math.round(projects.reduce((s, p) => s + (p.progress ?? 0), 0) / projects.length)
-      : 0;
-
-    // Metas
-    const goalsCompleted = goals.filter(g => goalProgress(g) >= 100);
-    const goalsActive    = goals.filter(g => goalProgress(g) < 100);
-    const goalsAvg       = goals.length > 0
-      ? Math.round(goals.reduce((s, g) => s + goalProgress(g), 0) / goals.length)
-      : 0;
-
-    // Tareas
-    const tasksPending = tasks.filter(t => t.status !== 'hecho').length;
-
-    // Próximos vencimientos (proyectos + metas)
-    const upcoming: Array<{ name: string; date: string; type: string }> = [
-      ...projects
-        .filter(p => p.target_date && p.target_date >= TODAY && !['finalizado','cancelado'].includes(safeProjectStatus(p)))
-        .map(p => ({ name: p.name, date: p.target_date!, type: 'Proyecto' })),
-      ...goals
-        .filter(g => g.deadline && g.deadline >= TODAY && goalProgress(g) < 100)
-        .map(g => ({ name: g.title, date: g.deadline!, type: 'Meta' })),
-    ].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
-
-    return { projActive, projPaused, projFinished, projOverdue, projAvgProgress, goalsCompleted, goalsActive, goalsAvg, tasksPending, upcoming };
-  }, [goals, projects, tasks]);
-
   if (loading) return <Loading />;
+  if (projects.length === 0) return <Empty text="No hay proyectos todavía." sub="Creá un proyecto para ver el avance acá." />;
+
+  const totalPending = tasks.filter(t => t.status !== 'hecho').length;
+  const projAvg = projects.length > 0
+    ? Math.round(projects.reduce((s, p) => s + (p.progress ?? 0), 0) / projects.length)
+    : 0;
+
+  const upcoming: Array<{ name: string; date: string; type: string }> = [
+    ...projects
+      .filter(p => p.target_date && p.target_date >= TODAY && !['finalizado','cancelado'].includes(safeProjectStatus(p)))
+      .map(p => ({ name: p.name, date: p.target_date!, type: 'Proyecto' })),
+    ...goals
+      .filter(g => g.deadline && g.deadline >= TODAY && goalProgress(g) < 100)
+      .map(g => ({ name: g.title, date: g.deadline!, type: 'Meta' })),
+  ].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Metrics grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        <Metric icon={<FolderKanban size={15} className="text-bordo-400" />} label="Proyectos activos" value={stats.projActive.length} />
-        <Metric icon={<Pause size={15} className="text-amber-400" />} label="En pausa" value={stats.projPaused.length} />
-        <Metric icon={<CheckCircle2 size={15} className="text-emerald-400" />} label="Finalizados" value={stats.projFinished.length} color="text-emerald-300" />
-        <Metric icon={<TrendingUp size={15} className="text-dorado-400" />} label="Avance promedio" value={`${stats.projAvgProgress}%`} />
-        <Metric icon={<Target size={15} className="text-dorado-400" />} label="Metas activas" value={stats.goalsActive.length} />
-        <Metric icon={<CheckCircle2 size={15} className="text-emerald-400" />} label="Metas completadas" value={stats.goalsCompleted.length} color="text-emerald-300" />
-        <Metric icon={<ListChecks size={15} className="text-plata-400" />} label="Tareas pendientes" value={stats.tasksPending} />
-        {stats.projOverdue.length > 0 && (
-          <Metric icon={<AlertTriangle size={15} className="text-red-400" />} label="Proyectos atrasados" value={stats.projOverdue.length} color="text-red-300" />
-        )}
+      {/* Resumen rápido */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Metric icon={<FolderKanban size={15} className="text-dorado-400" />} label="Proyectos" value={projects.length} />
+        <Metric icon={<Target size={15} className="text-bordo-400" />} label="Metas" value={goals.length} />
+        <Metric icon={<ListChecks size={15} className="text-plata-400" />} label="Tareas activas" value={totalPending} />
+        <Metric icon={<TrendingUp size={15} className="text-dorado-400" />} label="Avance promedio" value={`${projAvg}%`} />
       </div>
 
-      {/* Barra avance proyectos */}
-      {projects.length > 0 && (
-        <div className="rounded-xl border border-plata-700/60 bg-plata-900/70 p-4">
-          <div className="flex justify-between text-xs text-plata-400 mb-1.5">
-            <span>Avance promedio de proyectos</span>
-            <span className="text-dorado-300 font-bold">{stats.projAvgProgress}%</span>
-          </div>
-          <div className="h-2.5 bg-plata-800 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-bordo-600 to-dorado-500 rounded-full transition-all" style={{ width: `${stats.projAvgProgress}%` }} />
-          </div>
-        </div>
-      )}
+      {/* Tarjeta por proyecto */}
+      <div className="flex flex-col gap-3">
+        {projects.map(p => {
+          const area         = AREA_CONFIG[p.area] ?? AREA_CONFIG['personal'];
+          const statusCfg    = PROJECT_STATUS_CONFIG[safeProjectStatus(p)];
+          const projGoals    = goals.filter(g => g.project_id === p.id);
+          const completedGoals = projGoals.filter(g => goalProgress(g) >= 100);
+          const projTasks    = tasks.filter(t => t.project_id === p.id);
+          const doneTasks    = projTasks.filter(t => t.status === 'hecho');
+          const overdue      = isProjectOverdue(p);
 
-      {/* Barra avance metas */}
-      {goals.length > 0 && (
-        <div className="rounded-xl border border-plata-700/60 bg-plata-900/70 p-4">
-          <div className="flex justify-between text-xs text-plata-400 mb-1.5">
-            <span>Avance general de metas</span>
-            <span className="text-dorado-300 font-bold">{stats.goalsAvg}%</span>
-          </div>
-          <div className="h-2 bg-plata-800 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-bordo-600 to-dorado-500 rounded-full transition-all" style={{ width: `${stats.goalsAvg}%` }} />
-          </div>
-        </div>
-      )}
+          // Progreso efectivo: manual si existe, sino promedio de metas
+          const progress = (p.progress ?? 0) > 0
+            ? (p.progress ?? 0)
+            : projGoals.length > 0
+              ? Math.round(projGoals.reduce((s, g) => s + goalProgress(g), 0) / projGoals.length)
+              : 0;
+
+          return (
+            <div key={p.id} className={`rounded-2xl border bg-plata-900/80 p-4 flex flex-col gap-3 ${
+              overdue ? 'border-red-500/20' : 'border-plata-700/50'
+            }`}>
+              {/* Header del proyecto */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${area.bg} ${area.color} ${area.border}`}>{area.label}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${statusCfg.bg} ${statusCfg.color} ${statusCfg.border}`}>{statusCfg.label}</span>
+                    <span className={`text-[10px] font-medium ${PRIORITY_CONFIG[p.priority ?? 'media'].color}`}>
+                      ● {PRIORITY_CONFIG[p.priority ?? 'media'].label}
+                    </span>
+                    {overdue && (
+                      <span className="text-[10px] text-red-400 font-medium">⚠ Atrasado {daysOverdue(p.target_date!)}d</span>
+                    )}
+                  </div>
+                  <h3 className="text-base font-bold text-white">{p.name}</h3>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xl font-bold text-dorado-300">{progress}%</p>
+                  {p.target_date && <p className="text-[10px] text-plata-500">Obj: {p.target_date}</p>}
+                </div>
+              </div>
+
+              {/* Barra de progreso */}
+              <div className="h-2 bg-plata-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-bordo-600 to-dorado-500 rounded-full transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              {/* Stats metas + tareas */}
+              <div className="flex gap-4 text-xs text-plata-400 flex-wrap">
+                <span>
+                  <span className="text-white font-medium">{completedGoals.length}/{projGoals.length}</span> metas
+                </span>
+                {projTasks.length > 0 && (
+                  <span>
+                    <span className="text-white font-medium">{doneTasks.length}/{projTasks.length}</span> tareas
+                  </span>
+                )}
+                {p.next_step && (
+                  <span className="text-dorado-300 truncate max-w-xs">→ {p.next_step}</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {/* Próximos vencimientos */}
-      {stats.upcoming.length > 0 && (
+      {upcoming.length > 0 && (
         <div className="rounded-xl border border-plata-700/60 bg-plata-900/70 p-4">
           <p className="text-sm font-semibold text-plata-200 mb-3 flex items-center gap-2">
-            <Calendar size={14} className="text-dorado-400" /> Próximas fechas importantes
+            <Calendar size={14} className="text-dorado-400" /> Próximas fechas
           </p>
           <div className="flex flex-col gap-2">
-            {stats.upcoming.map((item, i) => (
+            {upcoming.map((item, i) => (
               <div key={i} className="flex items-center justify-between gap-2 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-plata-800/60 text-plata-400 shrink-0">{item.type}</span>
@@ -294,10 +339,6 @@ function AvanceTab() {
           </div>
         </div>
       )}
-
-      {projects.length === 0 && goals.length === 0 && (
-        <Empty text="Todavía no hay proyectos ni metas." sub="Creá proyectos y metas para ver tu avance general." />
-      )}
     </div>
   );
 }
@@ -307,77 +348,156 @@ function AvanceTab() {
 function AtrasadosTab() {
   const { goals, projects, tasks, loading } = useObjetivosData();
 
-  const items = useMemo(() => {
-    const result: Array<{
-      id: string; type: 'Proyecto' | 'Meta' | 'Tarea';
-      name: string; date: string; dias: number;
-      priority: string; status: string; area: string;
-    }> = [];
+  type OverdueItem = { id: string; type: 'Proyecto' | 'Meta' | 'Tarea'; name: string; date: string; dias: number; priority: string };
 
-    // Proyectos atrasados
-    projects
-      .filter(isProjectOverdue)
-      .forEach(p => result.push({
-        id: p.id, type: 'Proyecto',
-        name: p.name, date: p.target_date!,
-        dias: daysOverdue(p.target_date!),
-        priority: p.priority ?? 'media',
-        status: PROJECT_STATUS_CONFIG[safeProjectStatus(p)]?.label ?? 'Activo',
-        area: (AREA_CONFIG[p.area] ?? AREA_CONFIG['personal']).label,
-      }));
+  const { byProject, orphans } = useMemo(() => {
+    // Proyectos atrasados (siempre van al nivel raíz)
+    const overdueProjects = projects.filter(isProjectOverdue).map(p => ({
+      project: p,
+      items: [] as OverdueItem[],
+    }));
 
     // Metas atrasadas
-    goals
-      .filter(g => g.deadline && g.deadline < TODAY && goalProgress(g) < 100)
-      .forEach(g => result.push({
-        id: g.id, type: 'Meta',
-        name: g.title, date: g.deadline!,
-        dias: daysOverdue(g.deadline!),
-        priority: '', status: `${goalProgress(g)}%`,
-        area: AREA_CONFIG[g.area].label,
-      }));
+    const overdueGoals = goals.filter(g => g.deadline && g.deadline < TODAY && goalProgress(g) < 100);
 
     // Tareas atrasadas
-    tasks
-      .filter(t => t.due_date && t.due_date < TODAY && t.status !== 'hecho')
-      .forEach(t => result.push({
-        id: t.id, type: 'Tarea',
-        name: t.title, date: t.due_date!,
-        dias: daysOverdue(t.due_date!),
-        priority: t.priority, status: t.status,
-        area: AREA_CONFIG[t.area].label,
-      }));
+    const overdueTasks = tasks.filter(t => t.due_date && t.due_date < TODAY && t.status !== 'hecho');
 
-    return result.sort((a, b) => b.dias - a.dias);
+    // Agrupar por proyecto
+    const map = new Map<string, { project: Project; items: OverdueItem[] }>();
+
+    // Primero inicializar con proyectos atrasados
+    for (const p of projects.filter(isProjectOverdue)) {
+      map.set(p.id, { project: p, items: [] });
+    }
+
+    // Metas con proyecto
+    for (const g of overdueGoals) {
+      if (g.project_id) {
+        if (!map.has(g.project_id)) {
+          const proj = projects.find(p => p.id === g.project_id);
+          if (proj) map.set(g.project_id, { project: proj, items: [] });
+        }
+        map.get(g.project_id)?.items.push({
+          id: g.id, type: 'Meta', name: g.title,
+          date: g.deadline!, dias: daysOverdue(g.deadline!), priority: '',
+        });
+      }
+    }
+
+    // Tareas con proyecto
+    for (const t of overdueTasks) {
+      if (t.project_id) {
+        if (!map.has(t.project_id)) {
+          const proj = projects.find(p => p.id === t.project_id);
+          if (proj) map.set(t.project_id, { project: proj, items: [] });
+        }
+        map.get(t.project_id)?.items.push({
+          id: t.id, type: 'Tarea', name: t.title,
+          date: t.due_date!, dias: daysOverdue(t.due_date!), priority: t.priority,
+        });
+      }
+    }
+
+    // Huérfanos (sin proyecto)
+    const orphanGoals: OverdueItem[] = overdueGoals.filter(g => !g.project_id).map(g => ({
+      id: g.id, type: 'Meta' as const, name: g.title,
+      date: g.deadline!, dias: daysOverdue(g.deadline!), priority: '',
+    }));
+    const orphanTasks: OverdueItem[] = overdueTasks.filter(t => !t.project_id).map(t => ({
+      id: t.id, type: 'Tarea' as const, name: t.title,
+      date: t.due_date!, dias: daysOverdue(t.due_date!), priority: t.priority,
+    }));
+
+    return {
+      byProject: Array.from(map.values()),
+      orphans: [...orphanGoals, ...orphanTasks].sort((a, b) => b.dias - a.dias),
+    };
   }, [goals, projects, tasks]);
 
   if (loading) return <Loading />;
-  if (items.length === 0) return <Empty text="No hay ítems atrasados." sub="¡Bien! Todo está al día." />;
+  if (byProject.length === 0 && orphans.length === 0) {
+    return <Empty text="No hay ítems atrasados." sub="¡Todo al día!" />;
+  }
 
   return (
-    <div className="flex flex-col gap-2">
-      {items.map(item => (
-        <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-900/10 px-4 py-3">
-          <AlertTriangle size={16} className="text-red-400 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">{item.name}</p>
-            <div className="flex gap-2 flex-wrap mt-0.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-plata-800/60 text-plata-300">{item.type}</span>
-              <span className="text-[10px] text-plata-400">{item.area}</span>
-              <span className="text-[10px] text-plata-500">{item.status}</span>
-              {item.priority && (
-                <span className={`text-[10px] font-medium ${PRIORITY_CONFIG[item.priority as 'alta'|'media'|'baja']?.color ?? 'text-plata-400'}`}>
-                  ● {PRIORITY_CONFIG[item.priority as 'alta'|'media'|'baja']?.label}
-                </span>
-              )}
+    <div className="flex flex-col gap-5">
+      {byProject.map(({ project, items }) => {
+        const area      = AREA_CONFIG[project.area] ?? AREA_CONFIG['personal'];
+        const overdue   = isProjectOverdue(project);
+        return (
+          <section key={project.id}>
+            {/* Proyecto header */}
+            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 mb-2 ${
+              overdue ? 'border-red-500/30 bg-red-900/10' : 'border-plata-700/50 bg-plata-900/60'
+            }`}>
+              <FolderKanban size={15} className={overdue ? 'text-red-400' : 'text-dorado-400'} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white">{project.name}</p>
+                <div className="flex gap-2 mt-0.5 flex-wrap">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${area.bg} ${area.color} ${area.border}`}>{area.label}</span>
+                  {overdue && (
+                    <span className="text-[10px] text-red-400">⚠ Proyecto atrasado {daysOverdue(project.target_date!)}d · venció {project.target_date}</span>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* Items del proyecto */}
+            {items.length > 0 && (
+              <div className="flex flex-col gap-1.5 pl-4">
+                {items.map(item => (
+                  <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-900/10 px-3 py-2">
+                    <AlertTriangle size={13} className="text-red-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-white truncate">{item.name}</p>
+                      <div className="flex gap-2 mt-0.5">
+                        <span className="text-[10px] bg-plata-800/60 text-plata-300 px-1.5 py-0.5 rounded-full">{item.type}</span>
+                        {item.priority && (
+                          <span className={`text-[10px] font-medium ${PRIORITY_CONFIG[item.priority as 'alta'|'media'|'baja']?.color ?? 'text-plata-400'}`}>
+                            ● {PRIORITY_CONFIG[item.priority as 'alta'|'media'|'baja']?.label}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs text-red-300 font-bold">{item.dias}d</p>
+                      <p className="text-[10px] text-plata-500">venció {item.date}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
+
+      {/* Huérfanos */}
+      {orphans.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle size={13} className="text-amber-400" />
+            <span className="text-sm font-bold text-amber-300">Sin proyecto</span>
+            <span className="text-[10px] text-plata-500 bg-plata-800/60 px-1.5 py-0.5 rounded-full">{orphans.length}</span>
+            <div className="flex-1 h-px bg-plata-700/40" />
           </div>
-          <div className="text-right shrink-0">
-            <p className="text-xs text-red-300 font-bold">{item.dias}d</p>
-            <p className="text-[10px] text-plata-500">venció {item.date}</p>
+          <div className="flex flex-col gap-1.5">
+            {orphans.map(item => (
+              <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-900/10 px-4 py-2.5">
+                <AlertTriangle size={13} className="text-red-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-white truncate">{item.name}</p>
+                  <span className="text-[10px] bg-plata-800/60 text-plata-300 px-1.5 py-0.5 rounded-full">{item.type}</span>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs text-red-300 font-bold">{item.dias}d</p>
+                  <p className="text-[10px] text-plata-500">venció {item.date}</p>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
-      ))}
+        </section>
+      )}
     </div>
   );
 }
@@ -387,60 +507,117 @@ function AtrasadosTab() {
 function FinalizadosTab() {
   const { goals, projects, tasks, loading } = useObjetivosData();
 
-  const items = useMemo(() => {
-    const result: Array<{
-      id: string; type: 'Proyecto' | 'Meta' | 'Tarea';
-      name: string; date: string | null; progress: number; area: string;
-    }> = [];
+  const { byProject, orphans } = useMemo(() => {
+    const doneGoals    = goals.filter(g => goalProgress(g) >= 100);
+    const doneTasks    = tasks.filter(t => t.status === 'hecho').slice(0, 50);
+    const doneProjects = projects.filter(p => safeProjectStatus(p) === 'finalizado');
 
-    projects
-      .filter(p => safeProjectStatus(p) === 'finalizado')
-      .forEach(p => result.push({
-        id: p.id, type: 'Proyecto',
-        name: p.name, date: p.target_date,
-        progress: p.progress ?? 100,
-        area: (AREA_CONFIG[p.area] ?? AREA_CONFIG['personal']).label,
-      }));
+    type DoneItem = { id: string; type: 'Meta' | 'Tarea'; name: string; date: string | null };
 
-    goals
-      .filter(g => goalProgress(g) >= 100)
-      .forEach(g => result.push({
-        id: g.id, type: 'Meta',
-        name: g.title, date: g.deadline,
-        progress: 100, area: AREA_CONFIG[g.area].label,
-      }));
+    const map = new Map<string, { project: Project; items: DoneItem[]; isProjectDone: boolean }>();
 
-    tasks
-      .filter(t => t.status === 'hecho')
-      .slice(0, 30) // limitar tareas completadas
-      .forEach(t => result.push({
-        id: t.id, type: 'Tarea',
-        name: t.title, date: t.due_date,
-        progress: 100, area: AREA_CONFIG[t.area].label,
-      }));
+    for (const p of doneProjects) {
+      map.set(p.id, { project: p, items: [], isProjectDone: true });
+    }
 
-    return result;
+    for (const g of doneGoals) {
+      if (g.project_id) {
+        if (!map.has(g.project_id)) {
+          const proj = projects.find(p => p.id === g.project_id);
+          if (proj) map.set(g.project_id, { project: proj, items: [], isProjectDone: false });
+        }
+        map.get(g.project_id)?.items.push({ id: g.id, type: 'Meta', name: g.title, date: g.deadline });
+      }
+    }
+
+    for (const t of doneTasks) {
+      if (t.project_id) {
+        if (!map.has(t.project_id)) {
+          const proj = projects.find(p => p.id === t.project_id);
+          if (proj) map.set(t.project_id, { project: proj, items: [], isProjectDone: false });
+        }
+        map.get(t.project_id)?.items.push({ id: t.id, type: 'Tarea', name: t.title, date: t.due_date });
+      }
+    }
+
+    const orphanItems: DoneItem[] = [
+      ...doneGoals.filter(g => !g.project_id).map(g => ({ id: g.id, type: 'Meta' as const, name: g.title, date: g.deadline })),
+      ...doneTasks.filter(t => !t.project_id).map(t => ({ id: t.id, type: 'Tarea' as const, name: t.title, date: t.due_date })),
+    ];
+
+    return { byProject: Array.from(map.values()), orphans: orphanItems };
   }, [goals, projects, tasks]);
 
   if (loading) return <Loading />;
-  if (items.length === 0) return <Empty text="Todavía no hay ítems finalizados." sub="Cuando completes proyectos, metas o tareas aparecerán acá." />;
+  if (byProject.length === 0 && orphans.length === 0) {
+    return <Empty text="Todavía no hay ítems finalizados." sub="Los proyectos, metas y tareas completadas aparecerán acá." />;
+  }
 
   return (
-    <div className="flex flex-col gap-2">
-      {items.map(item => (
-        <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-900/10 px-4 py-3">
-          <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">{item.name}</p>
-            <div className="flex gap-2 flex-wrap mt-0.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-plata-800/60 text-plata-300">{item.type}</span>
-              <span className="text-[10px] text-plata-400">{item.area}</span>
-              {item.date && <span className="text-[10px] text-plata-500">Fecha: {item.date}</span>}
+    <div className="flex flex-col gap-5">
+      {byProject.map(({ project, items, isProjectDone }) => {
+        const area = AREA_CONFIG[project.area] ?? AREA_CONFIG['personal'];
+        return (
+          <section key={project.id}>
+            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 mb-2 ${
+              isProjectDone ? 'border-emerald-500/30 bg-emerald-900/10' : 'border-plata-700/50 bg-plata-900/60'
+            }`}>
+              {isProjectDone
+                ? <CheckCircle2 size={15} className="text-emerald-400" />
+                : <FolderKanban size={15} className="text-dorado-400" />
+              }
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white">{project.name}</p>
+                <div className="flex gap-2 mt-0.5 flex-wrap">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${area.bg} ${area.color} ${area.border}`}>{area.label}</span>
+                  {isProjectDone && <span className="text-[10px] text-emerald-300">Proyecto finalizado</span>}
+                </div>
+              </div>
+              <span className="text-xs font-bold text-emerald-300 shrink-0">{project.progress ?? 0}%</span>
             </div>
+            {items.length > 0 && (
+              <div className="flex flex-col gap-1.5 pl-4">
+                {items.map(item => (
+                  <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-900/10 px-3 py-2">
+                    <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-white truncate">{item.name}</p>
+                      <div className="flex gap-2 mt-0.5">
+                        <span className="text-[10px] bg-plata-800/60 text-plata-300 px-1.5 py-0.5 rounded-full">{item.type}</span>
+                        {item.date && <span className="text-[10px] text-plata-500">{item.date}</span>}
+                      </div>
+                    </div>
+                    <span className="text-xs text-emerald-300 font-bold shrink-0">✓</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
+
+      {orphans.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle size={13} className="text-amber-400" />
+            <span className="text-sm font-bold text-amber-300">Sin proyecto</span>
+            <span className="text-[10px] text-plata-500 bg-plata-800/60 px-1.5 py-0.5 rounded-full">{orphans.length}</span>
+            <div className="flex-1 h-px bg-plata-700/40" />
           </div>
-          <span className="text-xs text-emerald-300 font-bold shrink-0">{item.progress}%</span>
-        </div>
-      ))}
+          <div className="flex flex-col gap-1.5">
+            {orphans.map(item => (
+              <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-900/10 px-4 py-2.5">
+                <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-white truncate">{item.name}</p>
+                  <span className="text-[10px] bg-plata-800/60 text-plata-300 px-1.5 py-0.5 rounded-full">{item.type}</span>
+                </div>
+                <span className="text-xs text-emerald-300 font-bold shrink-0">✓</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -448,41 +625,52 @@ function FinalizadosTab() {
 // ─── TAB EN PAUSA ─────────────────────────────────────────────────────────────
 
 function EnPausaTab() {
-  const { projects, loading } = useObjetivosData();
+  const { projects, goals, loading } = useObjetivosData();
   const pausedProjects = useMemo(() => projects.filter(p => safeProjectStatus(p) === 'en_pausa'), [projects]);
 
   if (loading) return <Loading />;
   if (pausedProjects.length === 0) return <Empty text="No hay proyectos en pausa." sub="Los proyectos pausados aparecerán acá." />;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <p className="text-xs text-plata-500">
-        Para reactivar un proyecto, entrá a <span className="text-dorado-400">Proyectos</span> y usá el botón "Reactivar" en la tarjeta.
+        Para reactivar un proyecto, entrá a <span className="text-dorado-400">Proyectos</span> y usá "Reactivar".
       </p>
-      <div className="flex flex-col gap-2">
-        {pausedProjects.map(p => {
-          const area = AREA_CONFIG[p.area] ?? AREA_CONFIG['personal'];
-          const pri  = PRIORITY_CONFIG[p.priority ?? 'media'];
-          return (
-            <div key={p.id} className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-900/10 px-4 py-3">
-              <Pause size={16} className="text-amber-400 shrink-0" />
+      {pausedProjects.map(p => {
+        const area      = AREA_CONFIG[p.area] ?? AREA_CONFIG['personal'];
+        const pri       = PRIORITY_CONFIG[p.priority ?? 'media'];
+        const projGoals = goals.filter(g => g.project_id === p.id);
+        return (
+          <div key={p.id} className="rounded-2xl border border-amber-500/20 bg-amber-900/10 p-4 flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <Pause size={16} className="text-amber-400 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{p.name}</p>
-                <div className="flex gap-2 flex-wrap mt-0.5">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-plata-800/60 text-plata-300">Proyecto</span>
+                <p className="text-sm font-bold text-white">{p.name}</p>
+                <div className="flex gap-2 flex-wrap mt-1">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${area.bg} ${area.color} ${area.border}`}>{area.label}</span>
                   <span className={`text-[10px] font-medium ${pri.color}`}>● {pri.label}</span>
+                  {projGoals.length > 0 && (
+                    <span className="text-[10px] text-plata-400">{projGoals.length} metas</span>
+                  )}
                   {p.notes && <span className="text-[10px] text-plata-500 truncate max-w-[200px]">{p.notes}</span>}
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-xs text-dorado-300 font-bold">{p.progress}%</p>
+                <p className="text-sm font-bold text-dorado-300">{p.progress ?? 0}%</p>
                 {p.target_date && <p className="text-[10px] text-plata-500">Obj: {p.target_date}</p>}
               </div>
             </div>
-          );
-        })}
-      </div>
+            {projGoals.length > 0 && (
+              <div className="pl-7 flex flex-col gap-1">
+                {projGoals.slice(0, 3).map(g => (
+                  <p key={g.id} className="text-xs text-plata-400 truncate">· {g.title}</p>
+                ))}
+                {projGoals.length > 3 && <p className="text-xs text-plata-500">+{projGoals.length - 3} metas más</p>}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

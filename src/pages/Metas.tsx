@@ -1,21 +1,22 @@
 import { useEffect, useState } from 'react';
-import { Target, Plus, Trash2, Pencil, Loader2, X, Save, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import {
-  type Goal,
-  type Area,
-  type Timeframe,
-  AREA_CONFIG,
-  TIMEFRAME_CONFIG,
-  getGoalsWithProgress,
-  createGoal,
-  updateGoal,
-  deleteGoal,
+  Target, Plus, Trash2, Pencil, Loader2, X, Save,
+  AlertCircle, FolderKanban,
+} from 'lucide-react';
+import {
+  type Goal, type Project, type Area, type Timeframe,
+  AREA_CONFIG, TIMEFRAME_CONFIG,
+  getGoalsWithProgress, getProjects,
+  createGoal, updateGoal, deleteGoal, createProject,
 } from '../lib/planMaestro';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface GoalFormData {
   title: string;
+  project_id: string;     // '' = sin seleccionar (inválido para guardar)
   area: Area;
   timeframe: Timeframe;
   deadline: string;
@@ -25,44 +26,63 @@ interface GoalFormData {
 }
 
 const EMPTY_FORM: GoalFormData = {
-  title: '', area: 'modeltex', timeframe: 'corto',
+  title: '', project_id: '', area: 'modeltex', timeframe: 'corto',
   deadline: '', next_step: '', progress_manual: '', notes: '',
 };
 
+function formFromGoal(g: Goal): GoalFormData {
+  return {
+    title: g.title,
+    project_id: g.project_id ?? '',
+    area: g.area,
+    timeframe: g.timeframe,
+    deadline: g.deadline ?? '',
+    next_step: g.next_step ?? '',
+    progress_manual: g.progress_manual?.toString() ?? '',
+    notes: g.notes ?? '',
+  };
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function Metas() {
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [goals, setGoals]       = useState<Goal[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<GoalFormData>(EMPTY_FORM);
-  const [editGoal, setEditGoal] = useState<Goal | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [collapsed, setCollapsed] = useState<Record<Timeframe, boolean>>({ corto: false, mediano: false, largo: false });
+  const [form, setForm]         = useState<GoalFormData>(EMPTY_FORM);
+  const [editGoalId, setEditGoalId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<GoalFormData>(EMPTY_FORM);
+  const [saving, setSaving]     = useState(false);
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
-    try { setGoals(await getGoalsWithProgress()); }
-    catch (e) { console.error(e); }
+    try {
+      const [g, p] = await Promise.all([getGoalsWithProgress(), getProjects()]);
+      setGoals(g);
+      setProjects(p);
+    } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }
 
-  const byTimeframe = (tf: Timeframe) => goals.filter(g => g.timeframe === tf);
+  // ── Create ──────────────────────────────────────────────────────────────────
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.title.trim()) return;
+    if (!form.title.trim() || !form.project_id) return;
     setSaving(true);
     try {
       const g = await createGoal({
         title: form.title.trim(),
+        project_id: form.project_id,
         area: form.area,
         timeframe: form.timeframe,
         deadline: form.deadline || null,
         next_step: form.next_step.trim() || null,
         progress_manual: form.progress_manual ? parseInt(form.progress_manual) : null,
         notes: form.notes.trim() || null,
-        project_id: null,
       });
       setGoals(prev => [g, ...prev]);
       setForm(EMPTY_FORM);
@@ -71,25 +91,36 @@ export default function Metas() {
     finally { setSaving(false); }
   }
 
+  // ── Edit ────────────────────────────────────────────────────────────────────
+
+  function openEdit(g: Goal) {
+    setEditGoalId(g.id);
+    setEditForm(formFromGoal(g));
+  }
+
   async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault();
-    if (!editGoal) return;
+    if (!editGoalId || !editForm.project_id) return;
     setSaving(true);
     try {
-      await updateGoal(editGoal.id, {
-        title: editGoal.title,
-        area: editGoal.area,
-        timeframe: editGoal.timeframe,
-        deadline: editGoal.deadline,
-        next_step: editGoal.next_step,
-        progress_manual: editGoal.progress_manual,
-        notes: editGoal.notes,
-      });
-      setGoals(prev => prev.map(g => g.id === editGoal.id ? { ...g, ...editGoal } : g));
-      setEditGoal(null);
+      const patch = {
+        title: editForm.title.trim(),
+        project_id: editForm.project_id,
+        area: editForm.area,
+        timeframe: editForm.timeframe,
+        deadline: editForm.deadline || null,
+        next_step: editForm.next_step.trim() || null,
+        progress_manual: editForm.progress_manual ? parseInt(editForm.progress_manual) : null,
+        notes: editForm.notes.trim() || null,
+      };
+      await updateGoal(editGoalId, patch);
+      setGoals(prev => prev.map(g => g.id === editGoalId ? { ...g, ...patch } : g));
+      setEditGoalId(null);
     } catch (e) { console.error(e); }
     finally { setSaving(false); }
   }
+
+  // ── Delete ──────────────────────────────────────────────────────────────────
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar esta meta?')) return;
@@ -97,7 +128,23 @@ export default function Metas() {
     setGoals(prev => prev.filter(g => g.id !== id));
   }
 
-  const toggleCollapse = (tf: Timeframe) => setCollapsed(c => ({ ...c, [tf]: !c[tf] }));
+  // ── Project created from quick form ─────────────────────────────────────────
+
+  function handleProjectCreated(p: Project, target: 'create' | 'edit') {
+    setProjects(prev => [...prev, p]);
+    if (target === 'create') setForm(f => ({ ...f, project_id: p.id }));
+    else                     setEditForm(f => ({ ...f, project_id: p.id }));
+  }
+
+  // ── Group goals ─────────────────────────────────────────────────────────────
+
+  const withProject    = goals.filter(g => g.project_id);
+  const withoutProject = goals.filter(g => !g.project_id);
+
+  // Only projects that actually have goals
+  const projectsWithGoals = projects.filter(p => withProject.some(g => g.project_id === p.id));
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col gap-6">
@@ -108,7 +155,9 @@ export default function Metas() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-dorado-400/80">CEO DENIS</p>
             <h1 className="text-2xl font-bold text-white">Metas</h1>
-            <p className="text-sm text-plata-400 mt-0.5">{goals.filter(g => g.timeframe === 'corto').length} corto · {goals.filter(g => g.timeframe === 'mediano').length} mediano · {goals.filter(g => g.timeframe === 'largo').length} largo plazo</p>
+            <p className="text-sm text-plata-400 mt-0.5">
+              {goals.length} metas · {projects.length} proyectos
+            </p>
           </div>
           <button
             onClick={() => setShowForm(s => !s)}
@@ -119,18 +168,21 @@ export default function Metas() {
         </div>
       </div>
 
-      {/* New goal form */}
+      {/* Create form */}
       {showForm && (
         <GoalForm
           form={form}
           setForm={setForm}
+          projects={projects}
           onSubmit={handleCreate}
-          onCancel={() => setShowForm(false)}
+          onCancel={() => { setShowForm(false); setForm(EMPTY_FORM); }}
+          onProjectCreated={p => handleProjectCreated(p, 'create')}
           saving={saving}
           title="Nueva meta"
         />
       )}
 
+      {/* List */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={28} className="animate-spin text-dorado-400" />
@@ -139,67 +191,70 @@ export default function Metas() {
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <Target size={36} className="text-plata-600" />
           <p className="text-plata-400 font-medium">No hay metas definidas todavía.</p>
-          <p className="text-plata-500 text-sm">Definí tus metas por plazo para tener foco estratégico.</p>
+          <p className="text-plata-500 text-sm">Creá una meta y asignala a un proyecto.</p>
         </div>
       ) : (
-        (['corto', 'mediano', 'largo'] as Timeframe[]).map(tf => {
-          const tfGoals = byTimeframe(tf);
-          const cfg = TIMEFRAME_CONFIG[tf];
-          const isCollapsed = collapsed[tf];
-          return (
-            <section key={tf}>
-              <button
-                onClick={() => toggleCollapse(tf)}
-                className="w-full flex items-center gap-3 mb-3 group"
-              >
-                <div className={`flex items-center gap-2`}>
-                  <Target size={15} className={cfg.color} />
-                  <span className={`text-sm font-bold uppercase tracking-widest ${cfg.color}`}>{cfg.label}</span>
-                  <span className="text-xs text-plata-500 bg-plata-800/60 px-1.5 py-0.5 rounded-full">{tfGoals.length}</span>
+        <div className="flex flex-col gap-6">
+          {/* ── Agrupadas por proyecto ── */}
+          {projectsWithGoals.map(p => {
+            const projectGoals = withProject.filter(g => g.project_id === p.id);
+            const area = AREA_CONFIG[p.area] ?? AREA_CONFIG['personal'];
+            return (
+              <section key={p.id}>
+                <div className="flex items-center gap-2 mb-3">
+                  <FolderKanban size={14} className="text-dorado-400 shrink-0" />
+                  <span className="text-sm font-bold text-white">{p.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 ${area.bg} ${area.color} ${area.border}`}>
+                    {area.label}
+                  </span>
+                  <span className="text-[10px] text-plata-500 bg-plata-800/60 px-1.5 py-0.5 rounded-full shrink-0">
+                    {projectGoals.length}
+                  </span>
+                  <div className="flex-1 h-px bg-plata-700/40" />
                 </div>
-                <div className="flex-1 h-px bg-plata-700/40" />
-                {isCollapsed ? <ChevronDown size={14} className="text-plata-500" /> : <ChevronUp size={14} className="text-plata-500" />}
-              </button>
-
-              {!isCollapsed && (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {tfGoals.map(g => (
-                    <GoalCard key={g.id} goal={g} onEdit={() => setEditGoal({ ...g })} onDelete={() => handleDelete(g.id)} />
+                  {projectGoals.map(g => (
+                    <GoalCard key={g.id} goal={g} onEdit={() => openEdit(g)} onDelete={() => handleDelete(g.id)} />
                   ))}
-                  {tfGoals.length === 0 && (
-                    <div className="col-span-full rounded-xl border border-dashed border-plata-700/40 p-6 text-center text-sm text-plata-500">
-                      Sin metas en esta categoría
-                    </div>
-                  )}
                 </div>
-              )}
+              </section>
+            );
+          })}
+
+          {/* ── Sin proyecto (legado) ── */}
+          {withoutProject.length > 0 && (
+            <section>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle size={14} className="text-amber-400 shrink-0" />
+                <span className="text-sm font-bold text-amber-300">Sin proyecto</span>
+                <span className="text-[10px] text-plata-500 bg-plata-800/60 px-1.5 py-0.5 rounded-full shrink-0">
+                  {withoutProject.length}
+                </span>
+                <div className="flex-1 h-px bg-plata-700/40" />
+              </div>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-900/10 px-3 py-2 mb-3 text-xs text-amber-300">
+                Estas metas no tienen proyecto asignado. Editálas para relacionarlas.
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {withoutProject.map(g => (
+                  <GoalCard key={g.id} goal={g} onEdit={() => openEdit(g)} onDelete={() => handleDelete(g.id)} />
+                ))}
+              </div>
             </section>
-          );
-        })
+          )}
+        </div>
       )}
 
       {/* Edit modal */}
-      {editGoal && (
+      {editGoalId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <GoalForm
-            form={{
-              title: editGoal.title,
-              area: editGoal.area,
-              timeframe: editGoal.timeframe,
-              deadline: editGoal.deadline ?? '',
-              next_step: editGoal.next_step ?? '',
-              progress_manual: editGoal.progress_manual?.toString() ?? '',
-              notes: editGoal.notes ?? '',
-            }}
-            setForm={f => setEditGoal(prev => prev ? {
-              ...prev,
-              title: f.title, area: f.area, timeframe: f.timeframe,
-              deadline: f.deadline || null, next_step: f.next_step || null,
-              progress_manual: f.progress_manual ? parseInt(f.progress_manual) : null,
-              notes: f.notes || null,
-            } : prev)}
+            form={editForm}
+            setForm={setEditForm}
+            projects={projects}
             onSubmit={handleSaveEdit}
-            onCancel={() => setEditGoal(null)}
+            onCancel={() => setEditGoalId(null)}
+            onProjectCreated={p => handleProjectCreated(p, 'edit')}
             saving={saving}
             title="Editar meta"
             modal
@@ -210,8 +265,11 @@ export default function Metas() {
   );
 }
 
+// ─── GoalCard ─────────────────────────────────────────────────────────────────
+
 function GoalCard({ goal, onEdit, onDelete }: { goal: Goal; onEdit: () => void; onDelete: () => void }) {
-  const area = AREA_CONFIG[goal.area];
+  const area    = AREA_CONFIG[goal.area] ?? AREA_CONFIG['personal'];
+  const tf      = TIMEFRAME_CONFIG[goal.timeframe];
   const overdue = goal.deadline && goal.deadline < TODAY;
   const progress = goal.task_count && goal.task_count > 0
     ? Math.round((goal.done_task_count! / goal.task_count) * 100)
@@ -235,6 +293,7 @@ function GoalCard({ goal, onEdit, onDelete }: { goal: Goal; onEdit: () => void; 
         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border ${area.bg} ${area.color} ${area.border}`}>
           {area.label}
         </span>
+        <span className={`text-[10px] font-medium ${tf.color}`}>{tf.label}</span>
         {overdue && (
           <span className="flex items-center gap-1 text-[10px] font-medium text-red-400">
             <AlertCircle size={10} /> Atrasada
@@ -247,7 +306,6 @@ function GoalCard({ goal, onEdit, onDelete }: { goal: Goal; onEdit: () => void; 
         )}
       </div>
 
-      {/* Progress bar */}
       <div>
         <div className="flex justify-between text-[10px] text-plata-500 mb-1">
           <span>Progreso</span>
@@ -274,17 +332,53 @@ function GoalCard({ goal, onEdit, onDelete }: { goal: Goal; onEdit: () => void; 
   );
 }
 
+// ─── GoalForm ─────────────────────────────────────────────────────────────────
+
 function GoalForm({
-  form, setForm, onSubmit, onCancel, saving, title, modal,
+  form, setForm, projects, onSubmit, onCancel, onProjectCreated, saving, title, modal,
 }: {
   form: GoalFormData;
   setForm: (f: GoalFormData) => void;
+  projects: Project[];
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
+  onProjectCreated: (p: Project) => void;
   saving: boolean;
   title: string;
   modal?: boolean;
 }) {
+  const [showQuick, setShowQuick] = useState(false);
+  const [quickName, setQuickName] = useState('');
+  const [quickArea, setQuickArea] = useState<Area>('modeltex');
+  const [quickSaving, setQuickSaving] = useState(false);
+
+  async function handleQuickCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!quickName.trim()) return;
+    setQuickSaving(true);
+    try {
+      const p = await createProject({
+        name: quickName.trim(),
+        area: quickArea,
+        description: null,
+        color: null,
+        status: 'activo',
+        priority: 'media',
+        start_date: null,
+        target_date: null,
+        progress: 0,
+        next_step: null,
+        notes: null,
+      });
+      onProjectCreated(p);
+      setShowQuick(false);
+      setQuickName('');
+    } catch (e) { console.error(e); }
+    finally { setQuickSaving(false); }
+  }
+
+  const canSave = form.title.trim() && form.project_id;
+
   const content = (
     <form onSubmit={onSubmit} className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -293,12 +387,99 @@ function GoalForm({
           <X size={16} />
         </button>
       </div>
-      <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Título de la meta" className="pm-input" required autoFocus />
+
+      {/* Título */}
+      <input
+        value={form.title}
+        onChange={e => setForm({ ...form, title: e.target.value })}
+        placeholder="Título de la meta *"
+        className="pm-input"
+        required
+        autoFocus
+      />
+
+      {/* Proyecto relacionado — obligatorio */}
+      <div>
+        <label className="text-xs text-plata-400 mb-1 block">
+          Proyecto relacionado <span className="text-red-400">*</span>
+        </label>
+        {projects.length === 0 ? (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-900/10 px-3 py-2 text-xs text-amber-300">
+            Primero necesitás crear un proyecto.
+          </div>
+        ) : (
+          <select
+            value={form.project_id}
+            onChange={e => setForm({ ...form, project_id: e.target.value })}
+            className="pm-input"
+            required
+          >
+            <option value="">— Seleccioná un proyecto —</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Quick create project */}
+        {!showQuick ? (
+          <button
+            type="button"
+            onClick={() => setShowQuick(true)}
+            className="mt-1.5 flex items-center gap-1 text-[11px] text-dorado-400 hover:text-dorado-300 transition-colors"
+          >
+            <Plus size={11} /> Crear nuevo proyecto
+          </button>
+        ) : (
+          <div className="mt-2 rounded-xl border border-dorado-500/30 bg-plata-900/90 p-3 flex flex-col gap-2">
+            <p className="text-[11px] font-semibold text-dorado-300">Nuevo proyecto rápido</p>
+            <input
+              value={quickName}
+              onChange={e => setQuickName(e.target.value)}
+              placeholder="Nombre del proyecto"
+              className="pm-input text-sm"
+              autoFocus
+            />
+            <select
+              value={quickArea}
+              onChange={e => setQuickArea(e.target.value as Area)}
+              className="pm-input text-sm"
+            >
+              <option value="modeltex">MODELTEX</option>
+              <option value="moldey">MOLDEY</option>
+              <option value="personal">Personal</option>
+              <option value="sistemas">Sistemas</option>
+            </select>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowQuick(false); setQuickName(''); }}
+                className="flex-1 py-1.5 text-xs text-plata-400 border border-plata-700 rounded-lg hover:bg-plata-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleQuickCreate}
+                disabled={quickSaving || !quickName.trim()}
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-semibold bg-bordo-600 hover:bg-bordo-500 text-white rounded-lg transition-colors disabled:opacity-60"
+              >
+                {quickSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                Crear
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Área + Plazo */}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-plata-400 mb-1 block">Área</label>
           <select value={form.area} onChange={e => setForm({ ...form, area: e.target.value as Area })} className="pm-input">
-            {(Object.keys(AREA_CONFIG) as Area[]).map(a => <option key={a} value={a}>{AREA_CONFIG[a].label}</option>)}
+            {(Object.keys(AREA_CONFIG) as Area[]).map(a => (
+              <option key={a} value={a}>{AREA_CONFIG[a].label}</option>
+            ))}
           </select>
         </div>
         <div>
@@ -310,29 +491,65 @@ function GoalForm({
           </select>
         </div>
       </div>
+
+      {/* Fechas + Progreso */}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-plata-400 mb-1 block">Fecha límite</label>
-          <input type="date" value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })} className="pm-input" />
+          <input
+            type="date"
+            value={form.deadline}
+            onChange={e => setForm({ ...form, deadline: e.target.value })}
+            className="pm-input"
+          />
         </div>
         <div>
           <label className="text-xs text-plata-400 mb-1 block">Progreso manual (%)</label>
-          <input type="number" min="0" max="100" value={form.progress_manual} onChange={e => setForm({ ...form, progress_manual: e.target.value })} placeholder="0-100" className="pm-input" />
+          <input
+            type="number" min="0" max="100"
+            value={form.progress_manual}
+            onChange={e => setForm({ ...form, progress_manual: e.target.value })}
+            placeholder="0-100"
+            className="pm-input"
+          />
         </div>
       </div>
+
+      {/* Próximo paso */}
       <div>
         <label className="text-xs text-plata-400 mb-1 block">Próximo paso</label>
-        <input value={form.next_step} onChange={e => setForm({ ...form, next_step: e.target.value })} placeholder="¿Qué hay que hacer ahora?" className="pm-input" />
+        <input
+          value={form.next_step}
+          onChange={e => setForm({ ...form, next_step: e.target.value })}
+          placeholder="¿Qué hay que hacer ahora?"
+          className="pm-input"
+        />
       </div>
+
+      {/* Notas */}
       <div>
         <label className="text-xs text-plata-400 mb-1 block">Notas</label>
-        <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} className="pm-input resize-none" />
+        <textarea
+          value={form.notes}
+          onChange={e => setForm({ ...form, notes: e.target.value })}
+          rows={2}
+          className="pm-input resize-none"
+        />
       </div>
+
       <div className="flex gap-2 justify-end pt-1">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-plata-300 rounded-lg border border-plata-700 hover:bg-plata-800 transition-colors">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm text-plata-300 rounded-lg border border-plata-700 hover:bg-plata-800 transition-colors"
+        >
           Cancelar
         </button>
-        <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-bordo-600 hover:bg-bordo-500 text-white rounded-lg transition-colors disabled:opacity-60">
+        <button
+          type="submit"
+          disabled={saving || !canSave}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-bordo-600 hover:bg-bordo-500 text-white rounded-lg transition-colors disabled:opacity-60"
+        >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar
         </button>
       </div>
@@ -341,7 +558,7 @@ function GoalForm({
 
   if (modal) {
     return (
-      <div className="w-full max-w-lg rounded-2xl border border-plata-700/60 bg-plata-900 shadow-pm-lg p-5">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-plata-700/60 bg-plata-900 shadow-pm-lg p-5">
         {content}
       </div>
     );
