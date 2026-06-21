@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useTheme } from '../lib/theme';
 import {
   Sun, Moon, Menu, X, LogOut, Crown, Shield,
-  CalendarCheck, LayoutDashboard, Target, Bot, Compass, Flame, Radar, BookText, BrainCircuit,
+  CalendarDays, Target, Bot, Compass, Flame, Radar, BookText, BrainCircuit,
 } from 'lucide-react';
 import BusinessQuickAccess from './BusinessQuickAccess';
 
-export type Page = 'hoy' | 'kanban' | 'objetivos' | 'metas' | 'proyectos' | 'mapa-futuro' | 'disciplina' | 'radar' | 'bitacora' | 'ai-assistant' | 'memoria-ia' | 'users';
+export type Page = 'agenda' | 'hoy' | 'kanban' | 'objetivos' | 'metas' | 'proyectos' | 'mapa-futuro' | 'disciplina' | 'radar' | 'bitacora' | 'ai-assistant' | 'memoria-ia' | 'users';
 
 interface LayoutProps {
   currentPage: Page;
@@ -19,22 +19,24 @@ interface LayoutProps {
 interface NavItem {
   page: Page;
   label: string;
-  icon: typeof CalendarCheck;
+  icon: typeof CalendarDays;
   adminOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { page: 'hoy',          label: 'Hoy',          icon: CalendarCheck },
-  { page: 'kanban',       label: 'Kanban',        icon: LayoutDashboard },
-  { page: 'objetivos',    label: 'Objetivos',     icon: Target },
-  { page: 'mapa-futuro',  label: 'Brújula',       icon: Compass },
-  { page: 'disciplina',   label: 'Disciplina',    icon: Flame },
-  { page: 'radar',        label: 'Radar',         icon: Radar },
-  { page: 'bitacora',     label: 'Bitácora',      icon: BookText },
-  { page: 'ai-assistant', label: 'Asistente IA',  icon: Bot },
-  { page: 'memoria-ia',   label: 'Memoria IA',    icon: BrainCircuit },
-  { page: 'users',        label: 'Usuarios',      icon: Shield, adminOnly: true },
+  { page: 'agenda',       label: 'Agenda',       icon: CalendarDays },
+  { page: 'objetivos',    label: 'Objetivos',    icon: Target },
+  { page: 'mapa-futuro',  label: 'Brújula',      icon: Compass },
+  { page: 'disciplina',   label: 'Disciplina',   icon: Flame },
+  { page: 'radar',        label: 'Radar',        icon: Radar },
+  { page: 'bitacora',     label: 'Bitácora',     icon: BookText },
+  { page: 'ai-assistant', label: 'Asistente IA', icon: Bot },
+  { page: 'memoria-ia',   label: 'Memoria IA',   icon: BrainCircuit },
+  { page: 'users',        label: 'Usuarios',     icon: Shield, adminOnly: true },
 ];
+
+// Páginas que cuentan como "agenda" para resaltar el ítem del sidebar
+const AGENDA_PAGES: Page[] = ['agenda', 'hoy', 'kanban'];
 
 export default function Layout({ currentPage, onNavigate, children, isAdmin = false, onLogout }: LayoutProps) {
   const { theme, toggleTheme } = useTheme();
@@ -47,6 +49,11 @@ export default function Layout({ currentPage, onNavigate, children, isAdmin = fa
 
   const visibleItems = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
 
+  function isActive(page: Page): boolean {
+    if (page === 'agenda') return AGENDA_PAGES.includes(currentPage);
+    return currentPage === page;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-plata-900 via-plata-800 to-bordo-900 transition-colors duration-200">
       {/* Top bar */}
@@ -58,7 +65,7 @@ export default function Layout({ currentPage, onNavigate, children, isAdmin = fa
           {sidebarOpen ? <X size={20} className="text-plata-300" /> : <Menu size={20} className="text-dorado-400" />}
         </button>
 
-        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => handleNav('hoy')}>
+        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => handleNav('agenda')}>
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-bordo-600 shadow-pm">
             <Crown size={18} className="text-dorado-300" />
           </div>
@@ -113,7 +120,7 @@ export default function Layout({ currentPage, onNavigate, children, isAdmin = fa
               key={page}
               onClick={() => handleNav(page)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                currentPage === page
+                isActive(page)
                   ? 'bg-bordo-500/20 text-dorado-300 border-l-2 border-dorado-400'
                   : 'text-plata-300 hover:bg-plata-800 hover:text-white'
               }`}
