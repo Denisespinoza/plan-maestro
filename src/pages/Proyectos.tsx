@@ -56,8 +56,8 @@ function formFromProject(p: Project): ProjectFormData {
     name: p.name,
     description: p.description ?? '',
     area: p.area,
-    status: p.status,
-    priority: p.priority,
+    status: p.status ?? 'activo',
+    priority: p.priority ?? 'media',
     start_date: p.start_date ?? '',
     target_date: p.target_date ?? '',
     progress: String(p.progress ?? 0),
@@ -179,8 +179,8 @@ export default function Proyectos() {
     return <div className="flex justify-center py-24"><Loader2 size={32} className="animate-spin text-dorado-400" /></div>;
   }
 
-  const activeProjects  = projects.filter(p => p.status === 'activo');
-  const pausedProjects  = projects.filter(p => p.status === 'en_pausa');
+  const activeProjects  = projects.filter(p => safeStatus(p) === 'activo');
+  const pausedProjects  = projects.filter(p => safeStatus(p) === 'en_pausa');
   const overdueProjects = projects.filter(isOverdue);
 
   return (
@@ -323,12 +323,12 @@ function ProjectCard({
       <div>
         <div className="flex justify-between text-[10px] text-plata-500 mb-1">
           <span>Progreso</span>
-          <span className="text-dorado-400 font-medium">{project.progress}%</span>
+          <span className="text-dorado-400 font-medium">{project.progress ?? 0}%</span>
         </div>
         <div className="h-2 bg-plata-800 rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-bordo-600 to-dorado-500 rounded-full transition-all"
-            style={{ width: `${project.progress}%` }}
+            style={{ width: `${project.progress ?? 0}%` }}
           />
         </div>
       </div>

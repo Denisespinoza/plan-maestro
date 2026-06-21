@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import {
   type Goal, type Project, type Task,
-  AREA_CONFIG, TIMEFRAME_CONFIG, PRIORITY_CONFIG, PROJECT_STATUS_CONFIG,
+  AREA_CONFIG, PRIORITY_CONFIG, PROJECT_STATUS_CONFIG,
   getGoalsWithProgress, getProjects, getTasks,
 } from '../lib/planMaestro';
 import Metas from './Metas';
@@ -221,7 +221,7 @@ function AvanceTab() {
     // Próximos vencimientos (proyectos + metas)
     const upcoming: Array<{ name: string; date: string; type: string }> = [
       ...projects
-        .filter(p => p.target_date && p.target_date >= TODAY && !['finalizado','cancelado'].includes(p.status))
+        .filter(p => p.target_date && p.target_date >= TODAY && !['finalizado','cancelado'].includes(safeProjectStatus(p)))
         .map(p => ({ name: p.name, date: p.target_date!, type: 'Proyecto' })),
       ...goals
         .filter(g => g.deadline && g.deadline >= TODAY && goalProgress(g) < 100)
