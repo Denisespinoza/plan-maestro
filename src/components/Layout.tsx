@@ -30,8 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { page: 'disciplina',   label: 'Disciplina',   icon: Flame },
   { page: 'radar',        label: 'Radar',        icon: Radar },
   { page: 'bitacora',     label: 'Bitácora',     icon: BookText },
-  { page: 'ai-assistant', label: 'Asistente IA', icon: Bot },
-  { page: 'memoria-ia',   label: 'Memoria IA',   icon: BrainCircuit },
+  { page: 'ai-assistant', label: 'Agente CEO',   icon: Bot },
   { page: 'users',        label: 'Usuarios',     icon: Shield, adminOnly: true },
 ];
 

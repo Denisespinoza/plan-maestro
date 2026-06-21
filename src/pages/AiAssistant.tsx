@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import {
-  Bot, Eraser, Loader2, MessageSquareText, Plus, Send, ShieldCheck, Sparkles, Trash2, User,
+  Bot, BrainCircuit, Eraser, Loader2, MessageSquareText, Plus, Send, ShieldCheck, Sparkles, Trash2, User,
 } from 'lucide-react';
+import MemoriaIA from './MemoriaIA';
 import {
   type AiChatMessage,
   type AiConversation,
@@ -38,6 +39,7 @@ function formatRelativeDate(d: string) {
 }
 
 export default function AiAssistant() {
+  const [activeTab, setActiveTab] = useState<'chat' | 'memoria'>('chat');
   const [conversations, setConversations] = useState<AiConversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -195,6 +197,36 @@ export default function AiAssistant() {
         </div>
       </div>
 
+      {/* Tabs: Chat / Memoria IA */}
+      <div className="flex gap-1.5 border-b border-plata-700/50 pb-px">
+        <button
+          onClick={() => setActiveTab('chat')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors -mb-px border-b-2 ${
+            activeTab === 'chat'
+              ? 'text-dorado-300 border-dorado-400'
+              : 'text-plata-400 border-transparent hover:text-white'
+          }`}
+        >
+          <Bot size={14} /> Chat
+        </button>
+        <button
+          onClick={() => setActiveTab('memoria')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors -mb-px border-b-2 ${
+            activeTab === 'memoria'
+              ? 'text-dorado-300 border-dorado-400'
+              : 'text-plata-400 border-transparent hover:text-white'
+          }`}
+        >
+          <BrainCircuit size={14} /> Memoria IA
+        </button>
+      </div>
+
+      {/* Tab: Memoria IA */}
+      {activeTab === 'memoria' && <MemoriaIA />}
+
+      {/* Tab: Chat — todo el contenido existente */}
+      {activeTab === 'chat' && <>
+
       {contextError && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
           No se pudo cargar el contexto: {contextError}
@@ -337,6 +369,8 @@ export default function AiAssistant() {
           </div>
         </section>
       </div>
+
+      </>}
     </div>
   );
 }
