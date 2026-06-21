@@ -127,16 +127,16 @@ function TareasTab() {
   const [goals, setGoals]       = useState<Goal[]>([]);
   const [loading, setLoading]   = useState(true);
 
-  // Form state
-  const [showForm, setShowForm]   = useState(false);
-  const [fProjectId, setFProjectId] = useState('');
-  const [fGoalId, setFGoalId]     = useState('');
-  const [fTitle, setFTitle]       = useState('');
+  // Form state — Meta es el selector principal; Proyecto se deriva automáticamente
+  const [showForm, setShowForm] = useState(false);
+  const [fGoalId, setFGoalId]   = useState('');
+  const [fTitle, setFTitle]     = useState('');
   const [fPriority, setFPriority] = useState<Priority>('media');
-  const [fDueDate, setFDueDate]   = useState('');
+  const [fDueDate, setFDueDate] = useState('');
   const [fBusiness, setFBusiness] = useState('');
-  const [fIsMit, setFIsMit]       = useState(false);
-  const [saving, setSaving]       = useState(false);
+  const [fIsMit, setFIsMit]     = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([getTasks(), getProjects(), getGoalsWithProgress()])
@@ -145,51 +145,79 @@ function TareasTab() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Metas filtradas por proyecto seleccionado
-  const projectGoals = useMemo(() =>
-    goals.filter(g => g.project_id === fProjectId),
-    [goals, fProjectId]
+  // Metas que tienen proyecto (las únicas válidas para crear tarea)
+  const goalsWithProject = useMemo(() =>
+    goals
+      .filter(g => g.project_id)
+      .map(g => ({ ...g, projectName: projects.find(p => p.id === g.project_id)?.name ?? '?' }))
+      .sort((a, b) => a.projectName.localeCompare(b.projectName)),
+    [goals, projects]
   );
 
-  function handleProjectChange(projectId: string) {
-    setFProjectId(projectId);
-    setFGoalId(''); // Limpiar meta al cambiar proyecto
+  // Meta y proyecto seleccionados actualmente
+  const selectedGoal    = useMemo(() => goals.find(g => g.id === fGoalId) ?? null, [goals, fGoalId]);
+  const selectedProject = useMemo(() =>
+    selectedGoal?.project_id ? (projects.find(p => p.id === selectedGoal.project_id) ?? null) : null,
+    [selectedGoal, projects]
+  );
+
+  function resetForm() {
+    setFGoalId(''); setFTitle(''); setFDueDate(''); setFBusiness('');
+    setFIsMit(false); setFPriority('media'); setCreateError(null);
   }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!fTitle.trim() || !fProjectId || !fGoalId) return;
+    setCreateError(null);
+
+    if (!fGoalId) { setCreateError('Seleccioná una meta antes de continuar.'); return; }
+    if (!fTitle.trim()) { setCreateError('El título de la tarea es obligatorio.'); return; }
+    if (!selectedGoal?.project_id) {
+      setCreateError('La meta seleccionada no tiene proyecto. Asignale uno primero en el tab Metas.');
+      return;
+    }
+
     setSaving(true);
     try {
-      const proj = projects.find(p => p.id === fProjectId);
       const t = await createTask({
         title: fTitle.trim(),
-        area: (proj?.area ?? 'personal') as Area,
+        area: (selectedProject?.area ?? 'personal') as Area,
         priority: fPriority,
         status: 'inbox',
         is_mit: fIsMit,
         due_date: fDueDate || null,
         position: 0,
-        project_id: fProjectId,
+        project_id: selectedGoal.project_id,
         goal_id: fGoalId,
         notes: null,
         business_key: fBusiness || null,
         column_key: null,
       });
       setTasks(prev => [...prev, t]);
-      setFTitle(''); setFDueDate(''); setFBusiness('');
-      setFIsMit(false); setFPriority('media');
+      resetForm();
       setShowForm(false);
-    } catch (e) { console.error(e); }
-    finally { setSaving(false); }
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Error al crear la tarea. Revisá la consola.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const activeTasks = useMemo(() =>
     tasks.filter(t => t.status !== 'hecho'), [tasks]
   );
 
-  const noProjectTasks = activeTasks.filter(t => !t.project_id);
-  const projectsWithTasks = projects.filter(p => activeTasks.some(t => t.project_id === p.id));
+  // Derivar project_id desde la meta si la tarea no lo tiene directamente
+  function resolveProjectId(task: Task): string | null {
+    if (task.project_id) return task.project_id;
+    if (task.goal_id) return goals.find(g => g.id === task.goal_id)?.project_id ?? null;
+    return null;
+  }
+
+  const noProjectTasks = activeTasks.filter(t => !resolveProjectId(t));
+  const projectsWithTasks = projects.filter(p =>
+    activeTasks.some(t => resolveProjectId(t) === p.id)
+  );
 
   if (loading) return <Loading />;
 
@@ -211,51 +239,59 @@ function TareasTab() {
         <form onSubmit={handleCreate} className="rounded-2xl border border-dorado-500/30 bg-plata-900/90 p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-dorado-300">Nueva tarea en Objetivos</h3>
-            <button type="button" onClick={() => setShowForm(false)} className="p-1 text-plata-400 hover:text-white rounded-lg">
+            <button type="button" onClick={() => { setShowForm(false); resetForm(); }} className="p-1 text-plata-400 hover:text-white rounded-lg">
               <X size={16} />
             </button>
           </div>
 
-          {/* 1. Proyecto */}
+          {/* Error display */}
+          {createError && (
+            <div className="rounded-lg border border-red-500/30 bg-red-900/20 px-3 py-2 text-xs text-red-300">
+              {createError}
+            </div>
+          )}
+
+          {/* 1. Meta relacionada — campo principal */}
           <div>
-            <label className="text-xs text-plata-400 mb-1 block">Proyecto <span className="text-red-400">*</span></label>
-            {projects.length === 0 ? (
+            <label className="text-xs text-plata-400 mb-1 block">
+              Meta relacionada <span className="text-red-400">*</span>
+            </label>
+            {goalsWithProject.length === 0 ? (
               <div className="rounded-lg border border-amber-500/30 bg-amber-900/10 px-3 py-2 text-xs text-amber-300">
-                Primero necesitás crear un proyecto.
+                No hay metas con proyecto asignado. Creá una meta en el tab <strong>Metas</strong> y asignale un proyecto.
               </div>
             ) : (
-              <select value={fProjectId} onChange={e => handleProjectChange(e.target.value)} className="pm-input" required>
-                <option value="">— Seleccioná un proyecto —</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <select
+                value={fGoalId}
+                onChange={e => { setFGoalId(e.target.value); setCreateError(null); }}
+                className="pm-input"
+                autoFocus
+              >
+                <option value="">— Seleccioná una meta —</option>
+                {goalsWithProject.map(g => (
+                  <option key={g.id} value={g.id}>
+                    {g.title} — {g.projectName}
+                  </option>
+                ))}
               </select>
             )}
           </div>
 
-          {/* 2. Meta (solo si hay proyecto) */}
-          {fProjectId && (
-            <div>
-              <label className="text-xs text-plata-400 mb-1 block">Meta relacionada <span className="text-red-400">*</span></label>
-              {projectGoals.length === 0 ? (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-900/10 px-3 py-2 text-xs text-amber-300">
-                  Este proyecto no tiene metas. Creá una meta primero en el tab <strong>Metas</strong>.
-                </div>
-              ) : (
-                <select value={fGoalId} onChange={e => setFGoalId(e.target.value)} className="pm-input" required>
-                  <option value="">— Seleccioná una meta —</option>
-                  {projectGoals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
-                </select>
-              )}
+          {/* 2. Proyecto detectado automáticamente (solo lectura) */}
+          {selectedProject && (
+            <div className="flex items-center gap-2 rounded-lg bg-plata-800/40 border border-plata-700/40 px-3 py-2">
+              <FolderKanban size={13} className="text-dorado-400 shrink-0" />
+              <span className="text-xs text-plata-400">Proyecto:</span>
+              <span className="text-xs font-semibold text-white truncate">{selectedProject.name}</span>
             </div>
           )}
 
           {/* 3. Título */}
           <input
             value={fTitle}
-            onChange={e => setFTitle(e.target.value)}
+            onChange={e => { setFTitle(e.target.value); setCreateError(null); }}
             placeholder="Título de la tarea *"
             className="pm-input"
-            required
-            autoFocus={!fProjectId}
           />
 
           {/* 4. Prioridad + Fecha */}
@@ -292,12 +328,16 @@ function TareasTab() {
           </div>
 
           <div className="flex gap-2 justify-end pt-1">
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-plata-300 rounded-lg border border-plata-700 hover:bg-plata-800 transition-colors">
+            <button
+              type="button"
+              onClick={() => { setShowForm(false); resetForm(); }}
+              className="px-4 py-2 text-sm text-plata-300 rounded-lg border border-plata-700 hover:bg-plata-800 transition-colors"
+            >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={saving || !fTitle.trim() || !fProjectId || !fGoalId || projectGoals.length === 0}
+              disabled={saving || !fGoalId || !fTitle.trim() || !selectedGoal?.project_id}
               className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-bordo-600 hover:bg-bordo-500 text-white rounded-lg transition-colors disabled:opacity-60"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Crear tarea
@@ -313,7 +353,8 @@ function TareasTab() {
         <div className="flex flex-col gap-5">
           {projectsWithTasks.map(proj => {
             const area = AREA_CONFIG[proj.area] ?? AREA_CONFIG['personal'];
-            const projTasks = activeTasks.filter(t => t.project_id === proj.id);
+            // Incluir tareas con project_id directo O derivado desde su meta
+            const projTasks = activeTasks.filter(t => resolveProjectId(t) === proj.id);
             const goalsInProj = goals.filter(g =>
               g.project_id === proj.id && projTasks.some(t => t.goal_id === g.id)
             );
