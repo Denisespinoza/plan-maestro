@@ -312,7 +312,7 @@ function TaskModal({ biz, onClose }: { biz: Business; onClose: () => void }) {
       await createTask({
         title: title.trim(),
         notes: notes.trim() || null,
-        area: biz.key === 'moldey' ? 'moldey' : biz.key === 'modeltex' ? 'modeltex' : 'personal',
+        area: biz.key === 'moldey' ? 'moldey' : biz.key === 'modeltex' ? 'modeltex' : biz.key === 'modeltex_ia' ? 'sistemas' : 'personal',
         priority: 'media',
         status: 'inbox',
         is_mit: false,

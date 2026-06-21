@@ -56,6 +56,8 @@ function normPriority(v: unknown): Priority {
 
 function normBusiness(v: unknown): string | null {
   const b = str(v).toLowerCase();
+  // Verificar modeltex_ia ANTES de modeltex (es más específico)
+  if (b.includes('modeltex_ia') || b.includes('modeltex ia')) return 'modeltex_ia';
   if (b.includes('modeltex')) return 'modeltex';
   if (b.includes('moldey')) return 'moldey';
   return null;
@@ -66,6 +68,7 @@ function areaFromBusiness(business: string | null, areaRaw?: unknown): Area {
   if (a === 'modeltex' || a === 'moldey' || a === 'personal' || a === 'sistemas') return a as Area;
   if (business === 'modeltex') return 'modeltex';
   if (business === 'moldey') return 'moldey';
+  if (business === 'modeltex_ia') return 'sistemas';
   return 'personal';
 }
 
@@ -203,7 +206,7 @@ async function executeOne(a: AiAction): Promise<string> {
     case 'plan_business_time':
     case 'log_business_time': {
       const business = normBusiness(p.business);
-      if (!business) return 'No pude registrar el tiempo: especificá MODELTEX o MOLDEY.';
+      if (!business) return 'No pude registrar el tiempo: especificá MODELTEX, MOLDEY o MODELTEX IA.';
       const date = str(p.date) || TODAY();
       const mins = minutes(p.minutes);
       if (mins <= 0) return 'No pude registrar el tiempo: falta la cantidad (en minutos u horas).';
@@ -229,7 +232,7 @@ async function executeOne(a: AiAction): Promise<string> {
 
     case 'assign_task_business': {
       const business = normBusiness(p.business);
-      if (!business) return 'Especificá MODELTEX o MOLDEY para asignar la tarea.';
+      if (!business) return 'Especificá MODELTEX, MOLDEY o MODELTEX IA para asignar la tarea.';
       const match = await findTask(str(p.task_query));
       if (match.error) return match.error;
       await updateTask(match.task!.id, { business_key: business });

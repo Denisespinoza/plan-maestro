@@ -1288,10 +1288,11 @@ export interface BusinessTimeBlock {
   updated_at: string;
 }
 
-// Negocios iniciales (se crean en la primera carga si no existen)
+// Negocios iniciales (se agregan automáticamente si no existen para el usuario)
 export const DEFAULT_BUSINESSES: Array<{ key: string; name: string; color: string }> = [
-  { key: 'modeltex', name: 'MODELTEX', color: '#6B1E2E' }, // bordo
-  { key: 'moldey',   name: 'MOLDEY',   color: '#B8922A' }, // dorado
+  { key: 'modeltex',    name: 'MODELTEX',    color: '#6B1E2E' }, // bordo
+  { key: 'moldey',      name: 'MOLDEY',      color: '#B8922A' }, // dorado
+  { key: 'modeltex_ia', name: 'MODELTEX IA', color: '#94A3B8' }, // gris plateado
 ];
 
 // ── Enlaces externos por negocio ──
@@ -1310,11 +1311,12 @@ export interface BusinessLink {
 
 // Enlaces por defecto (sin URL — se configuran después). NO inventar URLs.
 export const DEFAULT_BUSINESS_LINKS: Array<{ business_key: string; label: string; type: string }> = [
-  { business_key: 'modeltex', label: 'MODELTEX.STORE', type: 'website' },
-  { business_key: 'modeltex', label: 'CEO MODELTEX',   type: 'system' },
-  { business_key: 'modeltex', label: 'MODELTEX IA',    type: 'ai' },
-  { business_key: 'moldey',   label: 'MOLDEY.COM',     type: 'website' },
-  { business_key: 'moldey',   label: 'CEO MOLDEY',     type: 'system' },
+  { business_key: 'modeltex',    label: 'MODELTEX.STORE', type: 'website' },
+  { business_key: 'modeltex',    label: 'CEO MODELTEX',   type: 'system' },
+  { business_key: 'modeltex',    label: 'MODELTEX IA',    type: 'ai' },
+  { business_key: 'moldey',      label: 'MOLDEY.COM',     type: 'website' },
+  { business_key: 'moldey',      label: 'CEO MOLDEY',     type: 'system' },
+  { business_key: 'modeltex_ia', label: 'MODELTEX IA',    type: 'ai' },
 ];
 
 export async function getBusinessLinks(): Promise<BusinessLink[]> {
@@ -1328,21 +1330,26 @@ export async function getBusinessLinks(): Promise<BusinessLink[]> {
   return data ?? [];
 }
 
-// Crea los enlaces por defecto si el usuario no tiene ninguno
+// Agrega enlaces por defecto faltantes para el usuario (compatible con usuarios existentes)
 export async function ensureBusinessLinks(): Promise<BusinessLink[]> {
-  const existing = await getBusinessLinks();
-  if (existing.length > 0) return existing;
-
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('No autenticado');
 
-  const rows = DEFAULT_BUSINESS_LINKS.map((l, i) => ({
+  const existing = await getBusinessLinks();
+  const existingKeys = new Set(existing.map(l => `${l.business_key}:${l.label}`));
+  const missing = DEFAULT_BUSINESS_LINKS.filter(l =>
+    !existingKeys.has(`${l.business_key}:${l.label}`)
+  );
+
+  if (missing.length === 0) return existing;
+
+  const rows = missing.map((l, i) => ({
     user_id: user.id, business_key: l.business_key, label: l.label,
-    url: null, type: l.type, sort_order: i, is_active: true,
+    url: null, type: l.type, sort_order: existing.length + i, is_active: true,
   }));
   const { data, error } = await supabase.from('pm_business_links').insert(rows).select();
   if (error) throw error;
-  return data ?? [];
+  return [...existing, ...(data ?? [])];
 }
 
 export async function updateBusinessLink(id: string, url: string | null): Promise<void> {
@@ -1368,21 +1375,24 @@ export async function getBusinesses(): Promise<Business[]> {
   return data ?? [];
 }
 
-// Crea los negocios por defecto si el usuario no tiene ninguno
+// Agrega negocios por defecto faltantes para el usuario (compatible con usuarios existentes)
 export async function ensureBusinesses(): Promise<Business[]> {
-  const existing = await getBusinesses();
-  if (existing.length > 0) return existing;
-
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('No autenticado');
 
-  const rows = DEFAULT_BUSINESSES.map((b, i) => ({
+  const existing = await getBusinesses();
+  const existingKeys = new Set(existing.map(b => b.key));
+  const missing = DEFAULT_BUSINESSES.filter(b => !existingKeys.has(b.key));
+
+  if (missing.length === 0) return existing;
+
+  const rows = missing.map((b, i) => ({
     user_id: user.id, key: b.key, name: b.name, color: b.color,
-    url: null, is_active: true, sort_order: i,
+    url: null, is_active: true, sort_order: existing.length + i,
   }));
   const { data, error } = await supabase.from('pm_businesses').insert(rows).select();
   if (error) throw error;
-  return data ?? [];
+  return [...existing, ...(data ?? [])];
 }
 
 export async function updateBusiness(id: string, data: Partial<Pick<Business, 'name' | 'url' | 'color' | 'is_active' | 'sort_order'>>): Promise<void> {
