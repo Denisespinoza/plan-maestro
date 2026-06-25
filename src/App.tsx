@@ -40,7 +40,7 @@ function AppContent() {
   const renderPage = () => {
     switch (currentPage) {
       // Agenda unifica Hoy + Kanban + nuevas vistas
-      case 'agenda':    return <Agenda onCerrarDia={cerrarDia} defaultTab="hoy" />;
+      case 'agenda':    return <Agenda onCerrarDia={cerrarDia} defaultTab="kanban" />;
       // Rutas legacy — redirigen a Agenda con su tab correspondiente
       case 'hoy':       return <Agenda onCerrarDia={cerrarDia} defaultTab="hoy" />;
       case 'kanban':    return <Agenda onCerrarDia={cerrarDia} defaultTab="kanban" />;

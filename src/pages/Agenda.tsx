@@ -36,7 +36,7 @@ const TODAY_ISO = new Date().toISOString().split('T')[0];
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Agenda({ onCerrarDia, defaultTab = 'hoy' }: AgendaProps) {
+export default function Agenda({ onCerrarDia, defaultTab = 'kanban' }: AgendaProps) {
   const [tab, setTab] = useState<AgendaTab>(defaultTab);
 
   return (
