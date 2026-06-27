@@ -193,7 +193,9 @@ function FocoBlock({ plan, projects, businesses, onSaved }: {
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState(!plan.focus_title);
   useEffect(() => {
+    setEditing(!plan.focus_title);
     setF({
       focus_title: plan.focus_title ?? '', focus_business: plan.focus_business ?? '',
       focus_project_id: plan.focus_project_id ?? '', motivation: plan.motivation ?? '',
@@ -216,7 +218,8 @@ function FocoBlock({ plan, projects, businesses, onSaved }: {
       await updateWeeklyPlan(plan.id, fields);
       onSaved({ ...plan, ...fields });
       setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      setEditing(false);
+      setTimeout(() => setSaved(false), 3000);
     } catch (e) {
       console.error(e);
       alert('No se pudo guardar el foco. Revisá tu conexión e intentá de nuevo.');
@@ -224,6 +227,41 @@ function FocoBlock({ plan, projects, businesses, onSaved }: {
     finally { setSaving(false); }
   }
 
+  const biz = businessBadge(plan.focus_business);
+  const proj = projects.find(pp => pp.id === plan.focus_project_id);
+
+  // ── VISTA GUARDADA (modo lectura) ──
+  if (!editing && plan.focus_title) {
+    return (
+      <SectionCard icon={<Flame size={15} />} title="Foco de la semana">
+        {saved && (
+          <div className="mb-3 flex items-center gap-2 text-sm text-emerald-300 bg-emerald-900/20 border border-emerald-600/40 rounded-lg px-3 py-2">
+            <CheckCircle2 size={15} /> Foco guardado correctamente
+          </div>
+        )}
+        <div className="rounded-xl border border-dorado-500/40 bg-dorado-900/10 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-dorado-400/80 mb-1">Foco activo de la semana</p>
+          <p className="text-lg font-bold text-white">{plan.focus_title}</p>
+          <div className="flex gap-1.5 flex-wrap mt-2">
+            {biz && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border" style={{ color: biz.color, borderColor: `${biz.color}66`, backgroundColor: `${biz.color}22` }}>{biz.name}</span>}
+            {proj && <span className="text-[11px] text-plata-300 bg-plata-800/60 px-2 py-0.5 rounded-full">📁 {proj.name}</span>}
+          </div>
+          {plan.motivation && <p className="text-sm text-dorado-200 italic mt-3">“{plan.motivation}”</p>}
+          {plan.avoid_list && (
+            <div className="mt-3">
+              <p className="text-[11px] font-semibold text-red-300/80 mb-0.5">A EVITAR:</p>
+              <p className="text-sm text-plata-300 whitespace-pre-line">{plan.avoid_list}</p>
+            </div>
+          )}
+        </div>
+        <button onClick={() => setEditing(true)} className="mt-3 self-start flex items-center gap-2 px-4 py-2 text-sm font-medium text-dorado-300 border border-dorado-500/40 hover:bg-dorado-900/20 rounded-xl">
+          Editar foco
+        </button>
+      </SectionCard>
+    );
+  }
+
+  // ── MODO EDICIÓN ──
   return (
     <SectionCard icon={<Flame size={15} />} title="Foco de la semana">
       <div className="flex flex-col gap-3">
@@ -246,7 +284,9 @@ function FocoBlock({ plan, projects, businesses, onSaved }: {
           <button onClick={save} disabled={saving} className="self-start flex items-center gap-2 px-4 py-2 bg-bordo-600 hover:bg-bordo-500 text-white rounded-xl text-sm font-medium disabled:opacity-60">
             {saving ? <Loader2 size={14} className="animate-spin" /> : 'Guardar foco'}
           </button>
-          {saved && <span className="text-sm text-emerald-300 flex items-center gap-1"><CheckCircle2 size={15} /> Guardado</span>}
+          {plan.focus_title && (
+            <button onClick={() => setEditing(false)} className="px-4 py-2 text-sm text-plata-400 hover:text-white rounded-xl border border-plata-700 hover:bg-plata-800">Cancelar</button>
+          )}
         </div>
       </div>
     </SectionCard>
