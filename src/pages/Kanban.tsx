@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { GripVertical, Plus, Trash2, Star, Loader2, X, Save, Pencil, Columns3 } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Star, Loader2, X, Save, Pencil, Columns3, LayoutDashboard, CalendarRange } from 'lucide-react';
+import KanbanSemana from './KanbanSemana';
 import {
   type Task,
   type TaskStatus,
@@ -55,6 +56,33 @@ function effectiveKey(t: Task): string {
 }
 
 export default function Kanban() {
+  const [view, setView] = useState<'board' | 'semana'>('board');
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="inline-flex self-start rounded-xl border border-plata-700/60 bg-plata-900/60 p-1 gap-1">
+        <button
+          onClick={() => setView('board')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
+            view === 'board' ? 'bg-bordo-600 text-white' : 'text-plata-400 hover:text-white'
+          }`}
+        >
+          <LayoutDashboard size={14} /> Kanban
+        </button>
+        <button
+          onClick={() => setView('semana')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
+            view === 'semana' ? 'bg-bordo-600 text-white' : 'text-plata-400 hover:text-white'
+          }`}
+        >
+          <CalendarRange size={14} /> Kanban Semana
+        </button>
+      </div>
+      {view === 'board' ? <KanbanBoard /> : <KanbanSemana />}
+    </div>
+  );
+}
+
+function KanbanBoard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [customColumns, setCustomColumns] = useState<KanbanColumn[]>([]);
   const [loading, setLoading] = useState(true);

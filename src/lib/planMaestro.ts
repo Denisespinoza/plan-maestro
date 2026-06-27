@@ -1591,6 +1591,105 @@ export async function getJournalContext(): Promise<JournalContext> {
   };
 }
 
+// ─── KANBAN SEMANA (control semanal) ───────────────────────────────────────────
+
+export interface WeekIndicator {
+  id: string;
+  name: string;
+  objetivo: number;
+  logrado: number;
+}
+
+export interface WeekBoard {
+  id: string;
+  user_id: string;
+  week_start: string;
+  enfoque: string | null;
+  meta_principal: string | null;
+  indicators: WeekIndicator[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WeekTaskLink {
+  id: string;
+  user_id: string;
+  week_start: string;
+  task_id: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Lunes (ISO) de la semana que contiene `date` (default: hoy). 'YYYY-MM-DD'.
+export function getWeekStart(date: Date = new Date()): string {
+  const d = new Date(date);
+  const day = (d.getDay() + 6) % 7; // 0 = lunes
+  d.setDate(d.getDate() - day);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+export function getWeekDays(weekStart: string): string[] {
+  const base = new Date(weekStart + 'T00:00:00');
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(base);
+    d.setDate(d.getDate() + i);
+    return d.toISOString().split('T')[0];
+  });
+}
+
+export async function getOrCreateWeekBoard(weekStart: string): Promise<WeekBoard> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+  const { data: existing } = await supabase
+    .from('pm_week_board').select('*').eq('week_start', weekStart).maybeSingle();
+  if (existing) return existing as WeekBoard;
+  const { data, error } = await supabase
+    .from('pm_week_board')
+    .insert({ user_id: user.id, week_start: weekStart, indicators: [] })
+    .select().single();
+  if (error) throw error;
+  return data as WeekBoard;
+}
+
+export async function updateWeekBoard(
+  id: string,
+  fields: Partial<Pick<WeekBoard, 'enfoque' | 'meta_principal' | 'indicators'>>
+): Promise<void> {
+  const { error } = await supabase.from('pm_week_board').update(fields).eq('id', id);
+  if (error) throw error;
+}
+
+export async function getWeekTaskLinks(weekStart: string): Promise<WeekTaskLink[]> {
+  const { data, error } = await supabase
+    .from('pm_week_tasks').select('*')
+    .eq('week_start', weekStart)
+    .order('position').order('created_at');
+  if (error) throw error;
+  return (data ?? []) as WeekTaskLink[];
+}
+
+// Marca una tarea EXISTENTE como meta de la semana (no duplica). Idempotente.
+export async function linkWeekTask(weekStart: string, taskId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+  const { error } = await supabase
+    .from('pm_week_tasks')
+    .upsert(
+      { user_id: user.id, week_start: weekStart, task_id: taskId },
+      { onConflict: 'user_id,week_start,task_id' }
+    );
+  if (error) throw error;
+}
+
+export async function unlinkWeekTask(id: string): Promise<void> {
+  const { error } = await supabase.from('pm_week_tasks').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // ─── MEMORIA IA ───────────────────────────────────────────────────────────────
 
 export type MemoryCategory =
