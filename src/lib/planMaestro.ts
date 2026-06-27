@@ -1481,7 +1481,7 @@ export async function getBusinessDaySummary(businessKey: string, workDate: strin
 
 // ─── BITÁCORA ───────────────────────────────────────────────────────────────
 
-export type JournalType = 'diario' | 'idea' | 'decision' | 'plan' | 'leccion' | 'cierre_diario';
+export type JournalType = 'diario' | 'idea' | 'decision' | 'plan' | 'leccion' | 'cierre_diario' | 'cierre_semanal';
 
 export interface JournalEntry {
   id: string;
@@ -1510,6 +1510,7 @@ export const JOURNAL_TYPE_CONFIG: Record<JournalType, { label: string; color: st
   plan:          { label: 'Plan',          color: '#8B5CF6' },
   leccion:       { label: 'Lección',       color: '#16A34A' },
   cierre_diario: { label: 'Cierre diario', color: '#D97706' },
+  cierre_semanal:{ label: 'Cierre semanal',color: '#C026D3' },
 };
 
 export async function getJournalEntries(type?: JournalType): Promise<JournalEntry[]> {
@@ -1589,6 +1590,211 @@ export async function getJournalContext(): Promise<JournalContext> {
     recentClosings: all.filter(e => e.type === 'cierre_diario').slice(0, 7),
     recentLessons: all.filter(e => e.type === 'leccion').slice(0, 10),
   };
+}
+
+// ─── SEMANA (tablero operativo semanal) ────────────────────────────────────────
+
+export type WeeklyColumn = 'plan' | 'foco' | 'proceso' | 'bloqueado' | 'hecho' | 'proxima';
+export type WeeklyGoalStatus = 'pendiente' | 'en_proceso' | 'hecha' | 'en_pausa';
+
+export const WEEKLY_COLUMNS: Array<{ key: WeeklyColumn; label: string; color: string }> = [
+  { key: 'plan',      label: 'Plan de la semana',    color: '#94A3B8' },
+  { key: 'foco',      label: 'En foco',              color: '#B8922A' },
+  { key: 'proceso',   label: 'En proceso',           color: '#3B82F6' },
+  { key: 'bloqueado', label: 'Bloqueado / esperando',color: '#D97706' },
+  { key: 'hecho',     label: 'Hecho',                color: '#16A34A' },
+  { key: 'proxima',   label: 'Pasar a próxima semana',color: '#8B5CF6' },
+];
+
+export const WEEKLY_GOAL_STATUS_CONFIG: Record<WeeklyGoalStatus, { label: string; color: string; bg: string }> = {
+  pendiente:  { label: 'Pendiente',  color: 'text-plata-300',   bg: 'bg-plata-700/40' },
+  en_proceso: { label: 'En proceso', color: 'text-blue-300',    bg: 'bg-blue-900/30' },
+  hecha:      { label: 'Hecha',      color: 'text-emerald-300', bg: 'bg-emerald-900/30' },
+  en_pausa:   { label: 'En pausa',   color: 'text-amber-300',   bg: 'bg-amber-900/20' },
+};
+
+export interface WeeklyIndicatorPair { objetivo: number; logrado: number; }
+export interface WeeklyHoursPair { objetivo: number; trabajadas: number; }
+export interface WeeklyIndicators {
+  ventas?: WeeklyIndicatorPair;
+  ingreso?: WeeklyIndicatorPair;
+  ahorro?: WeeklyIndicatorPair;
+  horas?: Record<string, WeeklyHoursPair>;  // por business_key
+}
+
+export interface WeeklyPlan {
+  id: string;
+  user_id: string;
+  week_start: string;
+  focus_title: string | null;
+  focus_project_id: string | null;
+  focus_business: string | null;
+  motivation: string | null;
+  avoid_list: string | null;
+  indicators: WeeklyIndicators;
+  closed: boolean;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WeeklyGoal {
+  id: string;
+  user_id: string;
+  week_start: string;
+  title: string;
+  description: string | null;
+  area: string | null;
+  priority: Priority;
+  status: WeeklyGoalStatus;
+  progress: number;
+  deadline: string | null;
+  project_id: string | null;
+  goal_id: string | null;
+  is_critical: boolean;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WeeklyTaskLink {
+  id: string;
+  user_id: string;
+  week_start: string;
+  task_id: string;
+  week_column: WeeklyColumn;
+  is_critical: boolean;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Lunes (ISO) de la semana que contiene `date` (default: hoy). Devuelve 'YYYY-MM-DD'.
+export function getWeekStart(date: Date = new Date()): string {
+  const d = new Date(date);
+  const day = (d.getDay() + 6) % 7; // 0 = lunes
+  d.setDate(d.getDate() - day);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+// Devuelve los 7 días (ISO) de la semana que arranca en weekStart
+export function getWeekDays(weekStart: string): string[] {
+  const base = new Date(weekStart + 'T00:00:00');
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(base);
+    d.setDate(d.getDate() + i);
+    return d.toISOString().split('T')[0];
+  });
+}
+
+// Obtiene (o crea) el plan semanal para la semana dada
+export async function getOrCreateWeeklyPlan(weekStart: string): Promise<WeeklyPlan> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+  const { data: existing } = await supabase
+    .from('pm_weekly_plans').select('*')
+    .eq('week_start', weekStart).maybeSingle();
+  if (existing) return existing as WeeklyPlan;
+  const { data, error } = await supabase
+    .from('pm_weekly_plans')
+    .insert({ user_id: user.id, week_start: weekStart, indicators: {} })
+    .select().single();
+  if (error) throw error;
+  return data as WeeklyPlan;
+}
+
+export async function updateWeeklyPlan(
+  id: string,
+  fields: Partial<Omit<WeeklyPlan, 'id' | 'user_id' | 'week_start' | 'created_at' | 'updated_at'>>
+): Promise<void> {
+  const { error } = await supabase.from('pm_weekly_plans').update(fields).eq('id', id);
+  if (error) throw error;
+}
+
+export async function getWeeklyGoals(weekStart: string): Promise<WeeklyGoal[]> {
+  const { data, error } = await supabase
+    .from('pm_weekly_goals').select('*')
+    .eq('week_start', weekStart)
+    .order('position').order('created_at');
+  if (error) throw error;
+  return (data ?? []) as WeeklyGoal[];
+}
+
+export async function createWeeklyGoal(
+  g: Omit<WeeklyGoal, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+): Promise<WeeklyGoal> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+  const { data, error } = await supabase
+    .from('pm_weekly_goals').insert({ ...g, user_id: user.id }).select().single();
+  if (error) throw error;
+  return data as WeeklyGoal;
+}
+
+export async function updateWeeklyGoal(
+  id: string, g: Partial<Omit<WeeklyGoal, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+): Promise<void> {
+  const { error } = await supabase.from('pm_weekly_goals').update(g).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteWeeklyGoal(id: string): Promise<void> {
+  const { error } = await supabase.from('pm_weekly_goals').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getWeeklyTaskLinks(weekStart: string): Promise<WeeklyTaskLink[]> {
+  const { data, error } = await supabase
+    .from('pm_weekly_task_links').select('*')
+    .eq('week_start', weekStart)
+    .order('position').order('created_at');
+  if (error) throw error;
+  return (data ?? []) as WeeklyTaskLink[];
+}
+
+// Vincula una tarea EXISTENTE a la semana (no duplica). Idempotente por (week, task).
+export async function linkTaskToWeek(
+  weekStart: string, taskId: string, column: WeeklyColumn = 'plan', isCritical = false
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autenticado');
+  const { error } = await supabase
+    .from('pm_weekly_task_links')
+    .upsert(
+      { user_id: user.id, week_start: weekStart, task_id: taskId, week_column: column, is_critical: isCritical },
+      { onConflict: 'user_id,week_start,task_id' }
+    );
+  if (error) throw error;
+}
+
+export async function updateWeeklyTaskLink(
+  id: string, fields: Partial<Pick<WeeklyTaskLink, 'week_column' | 'is_critical' | 'position'>>
+): Promise<void> {
+  const { error } = await supabase.from('pm_weekly_task_links').update(fields).eq('id', id);
+  if (error) throw error;
+}
+
+export async function unlinkTaskFromWeek(id: string): Promise<void> {
+  const { error } = await supabase.from('pm_weekly_task_links').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Suma minutos trabajados por negocio en la semana (desde pm_business_time_blocks)
+export async function getWeeklyWorkedMinutes(weekStart: string): Promise<Record<string, number>> {
+  const days = getWeekDays(weekStart);
+  const { data, error } = await supabase
+    .from('pm_business_time_blocks')
+    .select('business_key, worked_minutes, work_date')
+    .in('work_date', days);
+  if (error) throw error;
+  const out: Record<string, number> = {};
+  for (const b of (data ?? []) as { business_key: string; worked_minutes: number }[]) {
+    out[b.business_key] = (out[b.business_key] ?? 0) + (b.worked_minutes ?? 0);
+  }
+  return out;
 }
 
 // ─── MEMORIA IA ───────────────────────────────────────────────────────────────
