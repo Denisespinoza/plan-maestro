@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import Hoy from './Hoy';
 import Kanban from './Kanban';
-import SemanaTab from './Semana';
 import {
   type Task, type Project,
   AREA_CONFIG, PRIORITY_CONFIG, businessBadge,
@@ -98,6 +97,78 @@ function useTasksAndProjects() {
       .finally(() => setLoading(false));
   }, []);
   return { tasks, setTasks, projects, loading };
+}
+
+// ─── TAB SEMANA ───────────────────────────────────────────────────────────────
+
+function SemanaTab() {
+  const { tasks, loading } = useTasks();
+
+  const days = useMemo(() =>
+    Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      return d.toISOString().split('T')[0];
+    }), []);
+
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const t of tasks.filter(t => t.status !== 'hecho')) {
+      if (t.due_date && days.includes(t.due_date)) {
+        if (!map.has(t.due_date)) map.set(t.due_date, []);
+        map.get(t.due_date)!.push(t);
+      }
+    }
+    return map;
+  }, [tasks, days]);
+
+  if (loading) return <Loading />;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="relative overflow-hidden rounded-2xl border border-dorado-500/20 bg-plata-900/80 p-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-dorado-400/80">AGENDA</p>
+        <h2 className="text-xl font-bold text-white">Próximos 7 días</h2>
+        <p className="text-sm text-plata-400 mt-0.5">Tareas con fecha asignada</p>
+      </div>
+
+      {days.map(day => {
+        const dayTasks = tasksByDate.get(day) ?? [];
+        const isToday = day === TODAY_ISO;
+        const label = new Date(day + 'T00:00:00')
+          .toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'short' });
+
+        return (
+          <div key={day} className={`rounded-xl border p-4 ${
+            isToday
+              ? 'border-dorado-500/40 bg-dorado-900/10'
+              : 'border-plata-700/50 bg-plata-900/60'
+          }`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`text-sm font-bold capitalize ${isToday ? 'text-dorado-300' : 'text-white'}`}>
+                {label}
+              </span>
+              {isToday && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-dorado-900/40 text-dorado-300 border border-dorado-500/30">
+                  Hoy
+                </span>
+              )}
+              <span className="text-[10px] text-plata-500 bg-plata-800/60 px-1.5 py-0.5 rounded-full">
+                {dayTasks.length}
+              </span>
+            </div>
+            {dayTasks.length === 0 ? (
+              <p className="text-xs text-plata-600">Sin tareas asignadas</p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {dayTasks.map(t => <MiniTaskRow key={t.id} task={t} />)}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // ─── TAB CALENDARIO ───────────────────────────────────────────────────────────

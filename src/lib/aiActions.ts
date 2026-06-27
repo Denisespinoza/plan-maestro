@@ -9,10 +9,6 @@ import {
   createJournalEntry, upsertCierre, upsertTimeBlock,
   getTasks, getGoals, getProjects, getKanbanColumns,
   moveTaskToSystemColumn, moveTaskToCustomColumn, updateTask,
-  type WeeklyColumn, type WeeklyGoalStatus,
-  getWeekStart, getOrCreateWeeklyPlan, updateWeeklyPlan,
-  createWeeklyGoal, getWeeklyGoals, updateWeeklyGoal,
-  linkTaskToWeek,
 } from './planMaestro';
 
 const TODAY = () => new Date().toISOString().split('T')[0];
@@ -239,7 +235,7 @@ async function executeOne(a: AiAction): Promise<string> {
       });
       const label: Record<JournalType, string> = {
         idea: 'idea', decision: 'decisión', plan: 'plan', leccion: 'lección',
-        diario: 'entrada', cierre_diario: 'cierre', cierre_semanal: 'cierre semanal',
+        diario: 'entrada', cierre_diario: 'cierre',
       };
       return `Listo. Guardé la ${label[jt]} en Bitácora: "${str(p.title, str(p.content))}".`;
     }
@@ -293,98 +289,9 @@ async function executeOne(a: AiAction): Promise<string> {
       return `Listo. Asigné "${match.task!.title}" a ${businessName(business)}.`;
     }
 
-    case 'set_weekly_focus': {
-      const week = str(p.week_start) || getWeekStart();
-      const plan = await getOrCreateWeeklyPlan(week);
-      const business = normBusiness(p.business);
-      await updateWeeklyPlan(plan.id, {
-        focus_title: str(p.focus || p.title) || plan.focus_title,
-        focus_business: business ?? plan.focus_business,
-        motivation: str(p.motivation) || plan.motivation,
-        avoid_list: str(p.avoid || p.avoid_list) || plan.avoid_list,
-      });
-      return `Listo. Definí el foco de la semana: "${str(p.focus || p.title)}".`;
-    }
-
-    case 'create_weekly_goal': {
-      const week = str(p.week_start) || getWeekStart();
-      const existing = await getWeeklyGoals(week).catch(() => []);
-      const business = normBusiness(p.business);
-      const g = await createWeeklyGoal({
-        week_start: week,
-        title: str(p.title, 'Meta semanal'),
-        description: str(p.description) || null,
-        area: business ?? (str(p.area) || null),
-        priority: normPriority(p.priority),
-        status: normWeeklyStatus(p.status),
-        progress: minutes(p.progress),
-        deadline: str(p.deadline) || null,
-        project_id: null, goal_id: null,
-        is_critical: bool(p.is_critical || p.critical),
-        position: existing.length,
-      });
-      return `Listo. Creé la meta semanal: "${g.title}".${g.is_critical ? ' (crítica)' : ''}`;
-    }
-
-    case 'link_task_to_week': {
-      const week = str(p.week_start) || getWeekStart();
-      const match = await findTask(str(p.task_query || p.task));
-      if (match.error) return match.error;
-      const col = normWeeklyColumn(p.column);
-      await linkTaskToWeek(week, match.task!.id, col, bool(p.is_critical || p.critical));
-      return `Listo. Vinculé "${match.task!.title}" al Kanban semanal (${col}).`;
-    }
-
-    case 'mark_weekly_goal_critical': {
-      const week = str(p.week_start) || getWeekStart();
-      const gs = await getWeeklyGoals(week);
-      const q = str(p.title || p.goal).toLowerCase();
-      const found = gs.find(g => g.title.toLowerCase().includes(q));
-      if (!found) return `No encontré la meta semanal "${str(p.title || p.goal)}".`;
-      await updateWeeklyGoal(found.id, { is_critical: true });
-      return `Listo. Marqué "${found.title}" como meta crítica de la semana.`;
-    }
-
-    case 'create_weekly_closure': {
-      const week = str(p.week_start) || getWeekStart();
-      const plan = await getOrCreateWeeklyPlan(week);
-      const business = normBusiness(p.business);
-      await createJournalEntry({
-        type: 'cierre_semanal',
-        title: str(p.title, `Cierre semanal ${week}`),
-        content: str(p.content) || null,
-        entry_date: TODAY(),
-        status: null, area: business, priority: null,
-        related_business: business ? businessName(business) : null,
-        mood: null, energy_level: null, focus_level: null,
-        tags: ['cierre_semanal'],
-        metadata: { week_start: week },
-      });
-      await updateWeeklyPlan(plan.id, { closed: true, closed_at: new Date().toISOString() });
-      return `Listo. Registré el cierre semanal en la Bitácora y cerré la semana.`;
-    }
-
     default:
       return `Acción no reconocida: ${a.type}.`;
   }
-}
-
-function normWeeklyStatus(v: unknown): WeeklyGoalStatus {
-  const s = str(v).toLowerCase().trim();
-  if (s.startsWith('hech') || s === 'hecha' || s === 'completada') return 'hecha';
-  if (s.includes('proceso') || s.includes('curso')) return 'en_proceso';
-  if (s.includes('pausa')) return 'en_pausa';
-  return 'pendiente';
-}
-
-function normWeeklyColumn(v: unknown): WeeklyColumn {
-  const s = str(v).toLowerCase().trim();
-  if (s.includes('foco')) return 'foco';
-  if (s.includes('proceso')) return 'proceso';
-  if (s.includes('bloque') || s.includes('esper')) return 'bloqueado';
-  if (s.includes('hech')) return 'hecho';
-  if (s.includes('proxim') || s.includes('próxim')) return 'proxima';
-  return 'plan';
 }
 
 function fmtMin(m: number): string {
