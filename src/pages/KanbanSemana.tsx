@@ -60,20 +60,38 @@ export default function KanbanSemana() {
   return (
     <div className="flex flex-col gap-5">
       {/* Header + nav */}
-      <div className="rounded-2xl border border-dorado-500/20 bg-plata-900/80 p-4 flex items-center justify-between flex-wrap gap-3">
+      <div className={`rounded-2xl border p-4 flex items-center justify-between flex-wrap gap-3 ${
+        isCurrentWeek ? 'border-dorado-500/20 bg-plata-900/80' : 'border-amber-500/40 bg-amber-900/15'
+      }`}>
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-dorado-400/80">KANBAN · SEMANA</p>
           <h2 className="text-xl font-bold text-white">Control semanal</h2>
-          <p className="text-sm text-plata-400 mt-0.5">
-            {weekLabel(weekStart)} {isCurrentWeek && <span className="text-dorado-400">· semana actual</span>}
+          <p className="text-sm mt-0.5">
+            <span className="text-plata-300 font-semibold">{weekLabel(weekStart)}</span>{' '}
+            {isCurrentWeek
+              ? <span className="text-emerald-400">· semana actual</span>
+              : <span className="text-amber-300">· NO es la semana actual</span>}
           </p>
+          {(board.enfoque || board.meta_principal) && (
+            <p className="text-xs text-plata-400 mt-1">
+              {board.enfoque && <>🔥 <span className="text-plata-200">{board.enfoque}</span></>}
+              {board.enfoque && board.meta_principal && '  ·  '}
+              {board.meta_principal && <>🎯 <span className="text-plata-200">{board.meta_principal}</span></>}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <button onClick={() => shiftWeek(-7)} className="p-2 rounded-lg hover:bg-plata-800 text-plata-300 hover:text-white"><ChevronLeft size={18} /></button>
-          {!isCurrentWeek && <button onClick={() => setWeekStart(getWeekStart())} className="text-xs px-2 py-1 rounded-lg text-dorado-300 border border-dorado-500/30 hover:bg-dorado-900/20">Hoy</button>}
+          {!isCurrentWeek && <button onClick={() => setWeekStart(getWeekStart())} className="text-xs px-2 py-1 rounded-lg text-dorado-300 border border-dorado-500/30 hover:bg-dorado-900/20">Ir a hoy</button>}
           <button onClick={() => shiftWeek(7)} className="p-2 rounded-lg hover:bg-plata-800 text-plata-300 hover:text-white"><ChevronRight size={18} /></button>
         </div>
       </div>
+
+      {!isCurrentWeek && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-900/15 px-4 py-3 text-sm text-amber-200">
+          <span>⚠️ Estás viendo otra semana, no la actual. Lo que cargues acá se guarda en <b>{weekLabel(weekStart)}</b>. Apretá <b>“Ir a hoy”</b> para volver a la semana en curso.</span>
+        </div>
+      )}
 
       <CabeceraBlock board={board} onSaved={setBoard} />
       <IndicadoresBlock board={board} onSaved={setBoard} />
