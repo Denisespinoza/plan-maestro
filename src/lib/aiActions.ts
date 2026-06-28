@@ -2,14 +2,20 @@
 // Reutiliza los helpers existentes de planMaestro. No usa service_role.
 
 import {
-  type Area, type Priority, type TaskStatus,
-  type JournalType,
+  type Area, type Priority, type TaskStatus, type ProjectStatus,
+  type JournalType, type Project, type Goal,
+  type HabitArea, type HabitLogStatus, type VisionArea, type VisionStatus, type Timeframe,
   DEFAULT_BUSINESSES,
   createTask, createProject, createGoal,
   createJournalEntry, upsertCierre, upsertTimeBlock,
   getTasks, getGoals, getProjects, getKanbanColumns,
   moveTaskToSystemColumn, moveTaskToCustomColumn, updateTask,
-  getWeekStart, getWeekDays, getOrCreateWeekBoard, updateWeekBoard,
+  deleteTask, updateProject, deleteProject, updateGoal, deleteGoal,
+  getJournalEntries, updateJournalEntry, deleteJournalEntry,
+  createHabit, upsertHabitLog, getHabits,
+  createFutureVision, createAiMemory,
+  createKanbanColumn,
+  getWeekStart, getWeekDays, getOrCreateWeekBoard, updateWeekBoard, linkWeekTask,
 } from './planMaestro';
 
 const TODAY = () => new Date().toISOString().split('T')[0];
@@ -86,6 +92,67 @@ function minutes(v: unknown): number {
   if (typeof v === 'number') return Math.round(v);
   const n = parseInt(str(v).replace(/[^\d]/g, ''), 10);
   return isNaN(n) ? 0 : n;
+}
+
+function clampPct(v: unknown): number {
+  const n = minutes(v);
+  return Math.max(0, Math.min(100, n));
+}
+
+function normProjectStatus(v: unknown): ProjectStatus {
+  const s = str(v).toLowerCase();
+  if (s.startsWith('final') || s.includes('termin') || s.includes('complet')) return 'finalizado';
+  if (s.includes('pausa')) return 'en_pausa';
+  if (s.includes('cancel')) return 'cancelado';
+  if (s.includes('plane')) return 'planeado';
+  return 'activo';
+}
+
+function normTimeframe(v: unknown): Timeframe {
+  const s = str(v).toLowerCase();
+  if (s.startsWith('larg')) return 'largo';
+  if (s.startsWith('med')) return 'mediano';
+  return 'corto';
+}
+
+function normHabitArea(v: unknown): HabitArea {
+  const s = str(v).toLowerCase();
+  const valid: HabitArea[] = ['salud', 'trabajo', 'estudio', 'dinero', 'familia', 'mentalidad', 'personal'];
+  return (valid.find(a => s.includes(a)) ?? 'personal') as HabitArea;
+}
+
+function normVisionArea(v: unknown): VisionArea {
+  const s = str(v).toLowerCase();
+  const valid: VisionArea[] = ['negocios', 'familia', 'salud', 'dinero', 'viajes', 'estilo_vida', 'mentalidad', 'otra'];
+  return (valid.find(a => s.includes(a.replace('_', ' ')) || s.includes(a)) ?? 'otra') as VisionArea;
+}
+
+function normVisionStatus(v: unknown): VisionStatus {
+  const s = str(v).toLowerCase();
+  if (s.includes('logr')) return 'logrado';
+  if (s.includes('proceso')) return 'en_proceso';
+  if (s.includes('planif')) return 'planificacion';
+  return 'sonado';
+}
+
+async function findProject(query: string): Promise<{ project?: Project; error?: string }> {
+  const q = query.toLowerCase().trim();
+  if (!q) return { error: 'No me dijiste qué proyecto.' };
+  const projs = await getProjects();
+  const matches = projs.filter(p => p.name.toLowerCase().includes(q));
+  if (matches.length === 0) return { error: `No encontré ningún proyecto que coincida con "${query}".` };
+  if (matches.length > 1) return { error: `Hay varios proyectos con "${query}": ${matches.slice(0, 5).map(p => p.name).join(', ')}. ¿Cuál?` };
+  return { project: matches[0] };
+}
+
+async function findGoal(query: string): Promise<{ goal?: Goal; error?: string }> {
+  const q = query.toLowerCase().trim();
+  if (!q) return { error: 'No me dijiste qué meta.' };
+  const gs = await getGoals();
+  const matches = gs.filter(g => g.title.toLowerCase().includes(q));
+  if (matches.length === 0) return { error: `No encontré ninguna meta que coincida con "${query}".` };
+  if (matches.length > 1) return { error: `Hay varias metas con "${query}": ${matches.slice(0, 5).map(g => g.title).join(', ')}. ¿Cuál?` };
+  return { goal: matches[0] };
 }
 
 function businessName(key: string): string {
@@ -344,6 +411,195 @@ async function executeOne(a: AiAction): Promise<string> {
         business_key: business, column_key: null,
       });
       return `Listo. Creé la tarea "${t.title}" en el tablero del ${due}.`;
+    }
+
+    // ── TAREAS: editar / completar / borrar ──
+    case 'update_task': {
+      const m = await findTask(str(p.task_query || p.task));
+      if (m.error) return m.error;
+      const patch: Record<string, unknown> = {};
+      if (p.title !== undefined) patch.title = str(p.title);
+      if (p.due_date !== undefined) patch.due_date = str(p.due_date) || null;
+      if (p.priority !== undefined) patch.priority = normPriority(p.priority);
+      if (p.status !== undefined) patch.status = normStatus(p.status);
+      if (p.notes !== undefined) patch.notes = str(p.notes) || null;
+      if (p.is_mit !== undefined) patch.is_mit = bool(p.is_mit);
+      await updateTask(m.task!.id, patch);
+      return `Listo. Actualicé la tarea "${m.task!.title}".`;
+    }
+
+    case 'complete_task': {
+      const m = await findTask(str(p.task_query || p.task));
+      if (m.error) return m.error;
+      await updateTask(m.task!.id, { status: 'hecho' });
+      return `Listo. Marqué como hecha "${m.task!.title}".`;
+    }
+
+    case 'delete_task': {
+      const m = await findTask(str(p.task_query || p.task));
+      if (m.error) return m.error;
+      await deleteTask(m.task!.id);
+      return `Listo. Borré la tarea "${m.task!.title}".`;
+    }
+
+    // ── PROYECTOS: editar / borrar ──
+    case 'update_project': {
+      const r = await findProject(str(p.project_query || p.project || p.name));
+      if (r.error) return r.error;
+      const patch: Record<string, unknown> = {};
+      if (p.new_name !== undefined) patch.name = str(p.new_name);
+      if (p.status !== undefined) patch.status = normProjectStatus(p.status);
+      if (p.priority !== undefined) patch.priority = normPriority(p.priority);
+      if (p.progress !== undefined) patch.progress = clampPct(p.progress);
+      if (p.target_date !== undefined) patch.target_date = str(p.target_date) || null;
+      if (p.next_step !== undefined) patch.next_step = str(p.next_step) || null;
+      if (p.notes !== undefined) patch.notes = str(p.notes) || null;
+      await updateProject(r.project!.id, patch);
+      return `Listo. Actualicé el proyecto "${r.project!.name}".`;
+    }
+
+    case 'delete_project': {
+      const r = await findProject(str(p.project_query || p.project || p.name));
+      if (r.error) return r.error;
+      await deleteProject(r.project!.id);
+      return `Listo. Borré el proyecto "${r.project!.name}".`;
+    }
+
+    // ── METAS: editar / borrar ──
+    case 'update_goal': {
+      const r = await findGoal(str(p.goal_query || p.goal || p.title));
+      if (r.error) return r.error;
+      const patch: Record<string, unknown> = {};
+      if (p.new_title !== undefined) patch.title = str(p.new_title);
+      if (p.progress !== undefined) patch.progress_manual = clampPct(p.progress);
+      if (p.deadline !== undefined) patch.deadline = str(p.deadline) || null;
+      if (p.next_step !== undefined) patch.next_step = str(p.next_step) || null;
+      await updateGoal(r.goal!.id, patch);
+      return `Listo. Actualicé la meta "${r.goal!.title}".`;
+    }
+
+    case 'delete_goal': {
+      const r = await findGoal(str(p.goal_query || p.goal || p.title));
+      if (r.error) return r.error;
+      await deleteGoal(r.goal!.id);
+      return `Listo. Borré la meta "${r.goal!.title}".`;
+    }
+
+    // ── BITÁCORA: editar / borrar ──
+    case 'update_journal':
+    case 'delete_journal': {
+      const q = str(p.title || p.query).toLowerCase().trim();
+      if (!q) return 'No me dijiste qué entrada de Bitácora.';
+      const entries = await getJournalEntries();
+      const found = entries.find(e => e.title.toLowerCase().includes(q));
+      if (!found) return `No encontré la entrada "${str(p.title || p.query)}".`;
+      if (a.type === 'delete_journal') {
+        await deleteJournalEntry(found.id);
+        return `Listo. Borré la entrada "${found.title}".`;
+      }
+      const patch: Record<string, unknown> = {};
+      if (p.new_title !== undefined) patch.title = str(p.new_title);
+      if (p.content !== undefined) patch.content = str(p.content) || null;
+      if (p.status !== undefined) patch.status = str(p.status) || null;
+      await updateJournalEntry(found.id, patch);
+      return `Listo. Actualicé la entrada "${found.title}".`;
+    }
+
+    // ── DISCIPLINA: crear hábito / registrar día ──
+    case 'create_habit': {
+      const h = await createHabit({
+        name: str(p.name, 'Hábito'),
+        area: normHabitArea(p.area),
+        frequency: str(p.frequency).toLowerCase().startsWith('seman') ? 'semanal' : 'diario',
+        priority: normPriority(p.priority),
+        status: 'activo',
+        suggested_time: str(p.time) || null,
+        note: str(p.note) || null,
+        position: 0,
+      });
+      return `Listo. Creé el hábito "${h.name}".`;
+    }
+
+    case 'log_habit': {
+      const habits = await getHabits().catch(() => []);
+      const q = str(p.habit_query || p.habit || p.name).toLowerCase();
+      const found = habits.find(h => h.name.toLowerCase().includes(q));
+      if (!found) return `No encontré el hábito "${str(p.habit_query || p.habit)}".`;
+      const st = str(p.status).toLowerCase();
+      const status: HabitLogStatus = (st.startsWith('fall') || st.includes(' no')) ? 'failed' : st.includes('paus') ? 'paused' : 'completed';
+      await upsertHabitLog(found.id, str(p.date) || TODAY(), status);
+      const label = status === 'completed' ? 'cumplido' : status === 'failed' ? 'fallado' : 'pausado';
+      return `Listo. Registré "${found.name}" como ${label}.`;
+    }
+
+    // ── BRÚJULA / MAPA DE FUTURO: crear visión ──
+    case 'create_vision': {
+      const v = await createFutureVision({
+        title: str(p.title, 'Visión'),
+        area: normVisionArea(p.area),
+        area_custom: null,
+        timeframe: normTimeframe(p.timeframe),
+        status: normVisionStatus(p.status),
+        priority: normPriority(p.priority),
+        target_date: str(p.target_date) || null,
+        description: str(p.description) || null,
+        image_url: null,
+        position: 0,
+      });
+      return `Listo. Agregué la visión "${v.title}" a la Brújula.`;
+    }
+
+    // ── MEMORIA IA: que el agente guarde un hecho persistente ──
+    case 'add_memory': {
+      const m = await createAiMemory({
+        category: str(p.category) || 'general',
+        title: str(p.title, 'Memoria'),
+        content: str(p.content, str(p.title)),
+        importance: Math.max(1, Math.min(5, minutes(p.importance) || 3)),
+        source: 'agente_ceo',
+        is_active: true,
+      });
+      return `Listo. Guardé en tu memoria: "${m.title}".`;
+    }
+
+    // ── KANBAN: crear columna ──
+    case 'create_kanban_column': {
+      const cols = await getKanbanColumns().catch(() => []);
+      const col = await createKanbanColumn(str(p.name, 'Columna'), str(p.color) || null, cols.length);
+      return `Listo. Creé la columna "${col.name}" en el Kanban.`;
+    }
+
+    // ── KANBAN SEMANA: completar meta diaria / borrar indicador / vincular meta ──
+    case 'complete_week_meta': {
+      const board = await getOrCreateWeekBoard(getWeekStart());
+      const q = str(p.name || p.indicator).toLowerCase().trim();
+      const inds = board.indicators ?? [];
+      const found = inds.find(i => i.name.toLowerCase().includes(q));
+      if (!found) return `No encontré el indicador "${str(p.name || p.indicator)}".`;
+      const day = resolveDay(p.day);
+      const quota = Math.ceil(found.objetivo / 5);
+      const next = inds.map(i => i.id === found.id
+        ? { ...i, done_days: Array.from(new Set([...(i.done_days ?? []), day])), logrado: Math.min(i.objetivo, (i.logrado || 0) + quota) }
+        : i);
+      await updateWeekBoard(board.id, { indicators: next });
+      return `Listo. Marqué la meta diaria de "${found.name}" (${day}) como cumplida (+${quota}).`;
+    }
+
+    case 'delete_week_indicator': {
+      const board = await getOrCreateWeekBoard(getWeekStart());
+      const q = str(p.name).toLowerCase().trim();
+      const inds = board.indicators ?? [];
+      const found = inds.find(i => i.name.toLowerCase().includes(q));
+      if (!found) return `No encontré el indicador "${str(p.name)}".`;
+      await updateWeekBoard(board.id, { indicators: inds.filter(i => i.id !== found.id) });
+      return `Listo. Borré el indicador "${found.name}".`;
+    }
+
+    case 'link_week_meta': {
+      const m = await findTask(str(p.task_query || p.task));
+      if (m.error) return m.error;
+      await linkWeekTask(getWeekStart(), m.task!.id);
+      return `Listo. Marqué "${m.task!.title}" como meta de la semana.`;
     }
 
     default:
