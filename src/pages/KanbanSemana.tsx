@@ -24,6 +24,7 @@ function uid() {
 
 export default function KanbanSemana() {
   const [weekStart, setWeekStart] = useState(getWeekStart());
+  const [navOpen, setNavOpen] = useState(false); // modo "ver otras semanas"
   const [loading, setLoading] = useState(true);
   const [board, setBoard] = useState<WeekBoard | null>(null);
   const [links, setLinks] = useState<WeekTaskLink[]>([]);
@@ -52,6 +53,7 @@ export default function KanbanSemana() {
     d.setDate(d.getDate() + delta);
     setWeekStart(getWeekStart(d));
   }
+  function goToday() { setWeekStart(getWeekStart()); setNavOpen(false); }
 
   if (loading || !board) {
     return <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-dorado-400" /></div>;
@@ -80,16 +82,25 @@ export default function KanbanSemana() {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          <button onClick={() => shiftWeek(-7)} className="p-2 rounded-lg hover:bg-plata-800 text-plata-300 hover:text-white"><ChevronLeft size={18} /></button>
-          {!isCurrentWeek && <button onClick={() => setWeekStart(getWeekStart())} className="text-xs px-2 py-1 rounded-lg text-dorado-300 border border-dorado-500/30 hover:bg-dorado-900/20">Ir a hoy</button>}
-          <button onClick={() => shiftWeek(7)} className="p-2 rounded-lg hover:bg-plata-800 text-plata-300 hover:text-white"><ChevronRight size={18} /></button>
+        <div className="flex items-center gap-2">
+          {!navOpen ? (
+            <button onClick={() => setNavOpen(true)} className="text-xs px-3 py-1.5 rounded-lg text-plata-300 border border-plata-700 hover:bg-plata-800 hover:text-white">
+              Ver otra semana
+            </button>
+          ) : (
+            <>
+              <button onClick={() => shiftWeek(-7)} className="p-2 rounded-lg hover:bg-plata-800 text-plata-300 hover:text-white"><ChevronLeft size={18} /></button>
+              <button onClick={goToday} className="text-xs px-2 py-1 rounded-lg text-dorado-300 border border-dorado-500/30 hover:bg-dorado-900/20">Ir a hoy</button>
+              <button onClick={() => shiftWeek(7)} className="p-2 rounded-lg hover:bg-plata-800 text-plata-300 hover:text-white"><ChevronRight size={18} /></button>
+            </>
+          )}
         </div>
       </div>
 
       {!isCurrentWeek && (
-        <div className="flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-900/15 px-4 py-3 text-sm text-amber-200">
-          <span>⚠️ Estás viendo otra semana, no la actual. Lo que cargues acá se guarda en <b>{weekLabel(weekStart)}</b>. Apretá <b>“Ir a hoy”</b> para volver a la semana en curso.</span>
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-900/15 px-4 py-3 text-sm text-amber-200">
+          <span>⚠️ Estás viendo otra semana, no la actual. Lo que cargues acá se guarda en <b>{weekLabel(weekStart)}</b>.</span>
+          <button onClick={goToday} className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold">Volver a hoy</button>
         </div>
       )}
 
