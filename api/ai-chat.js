@@ -77,6 +77,12 @@ TIPOS DE ACCIÓN Y PARÁMETROS:
 - move_task: { task_query(texto del título de la tarea), column(inbox|hoy|en_curso|esperando|hecho o nombre de columna personalizada) }
 - assign_task_business: { task_query, business(modeltex|moldey) }
 
+KANBAN SEMANA (control semanal — Agenda > Kanban > Kanban Semana, semana actual):
+- set_week_focus: { enfoque?(texto), meta?(texto meta principal) } — define enfoque y/o meta principal de la semana.
+- add_week_indicator: { name, objetivo?(número), logrado?(número) } — agrega un objetivo obligatorio (ej: name "Ventas totales MODELTEX", objetivo 30). Aparece como tarjeta y se divide solo por día hábil.
+- update_week_indicator: { name(del indicador existente), objetivo?, logrado?, add?(suma esta cantidad a logrado) } — actualiza un indicador por su nombre.
+- add_day_task: { title, day?(YYYY-MM-DD o lunes|martes|...|domingo; default hoy), business? } — crea una tarea real ubicada en ese día del tablero semanal.
+
 Podés incluir VARIAS acciones en "actions" si Denis pide varias cosas a la vez.
 El campo "reply" debe ser corto, directo y en el estilo de CEO DENIS (sin motivación vacía).
 Ejemplo: usuario "creame una tarea para revisar modeltex.store mañana con prioridad alta" → {"actions":[{"type":"create_task","params":{"title":"Revisar modeltex.store","due_date":"2026-06-15","priority":"alta","business":"modeltex"}}],"reply":"Listo. Creé la tarea para revisar modeltex.store con prioridad alta para mañana."}`;
@@ -109,6 +115,27 @@ function buildContextText(ctx) {
   const s = ctx.tasksByStatus || {};
   lines.push(`Tareas totales: ${ctx.totalTasks ?? 0}`);
   lines.push(`Inbox: ${s.inbox ?? 0} | Hoy: ${s.hoy ?? 0} | En curso: ${s.en_curso ?? 0} | Esperando: ${s.esperando ?? 0} | Hecho: ${s.hecho ?? 0}`);
+  lines.push('');
+
+  // Kanban Semana (control semanal)
+  const wb = ctx.weekBoard || null;
+  lines.push('--- KANBAN SEMANA (semana actual) ---');
+  if (!wb) {
+    lines.push('Sin datos de la semana.');
+  } else {
+    lines.push(`Semana: ${fmt(wb.week_start)}`);
+    lines.push(`Enfoque: ${wb.enfoque || '—'}`);
+    lines.push(`Meta principal: ${wb.meta_principal || '—'}`);
+    const inds = Array.isArray(wb.indicators) ? wb.indicators : [];
+    if (inds.length === 0) {
+      lines.push('Indicadores: ninguno.');
+    } else {
+      for (const i of inds) {
+        const pct = i.objetivo > 0 ? Math.round((i.logrado / i.objetivo) * 100) : 0;
+        lines.push(`• ${fmt(i.name)}: ${i.logrado}/${i.objetivo} (${pct}%)`);
+      }
+    }
+  }
   lines.push('');
 
   // MIT

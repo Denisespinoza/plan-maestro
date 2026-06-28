@@ -9,6 +9,7 @@ import {
   createJournalEntry, upsertCierre, upsertTimeBlock,
   getTasks, getGoals, getProjects, getKanbanColumns,
   moveTaskToSystemColumn, moveTaskToCustomColumn, updateTask,
+  getWeekStart, getWeekDays, getOrCreateWeekBoard, updateWeekBoard,
 } from './planMaestro';
 
 const TODAY = () => new Date().toISOString().split('T')[0];
@@ -289,9 +290,78 @@ async function executeOne(a: AiAction): Promise<string> {
       return `Listo. Asigné "${match.task!.title}" a ${businessName(business)}.`;
     }
 
+    case 'set_week_focus': {
+      const board = await getOrCreateWeekBoard(getWeekStart());
+      const fields: { enfoque?: string | null; meta_principal?: string | null } = {};
+      if (p.enfoque !== undefined) fields.enfoque = str(p.enfoque) || null;
+      if (p.meta !== undefined || p.meta_principal !== undefined) fields.meta_principal = str(p.meta || p.meta_principal) || null;
+      await updateWeekBoard(board.id, fields);
+      return `Listo. Actualicé la semana${fields.enfoque ? ` · Enfoque: ${fields.enfoque}` : ''}${fields.meta_principal ? ` · Meta: ${fields.meta_principal}` : ''}.`;
+    }
+
+    case 'add_week_indicator': {
+      const board = await getOrCreateWeekBoard(getWeekStart());
+      const name = str(p.name).trim();
+      if (!name) return 'Falta el nombre del indicador.';
+      const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `id-${Date.now()}`;
+      const next = [...(board.indicators ?? []), { id, name, objetivo: minutes(p.objetivo), logrado: minutes(p.logrado) }];
+      await updateWeekBoard(board.id, { indicators: next });
+      return `Listo. Agregué el objetivo semanal "${name}" (meta ${minutes(p.objetivo)}).`;
+    }
+
+    case 'update_week_indicator': {
+      const board = await getOrCreateWeekBoard(getWeekStart());
+      const q = str(p.name).toLowerCase().trim();
+      const inds = board.indicators ?? [];
+      const found = inds.find(i => i.name.toLowerCase().includes(q));
+      if (!found) return `No encontré el indicador "${str(p.name)}".`;
+      const next = inds.map(i => {
+        if (i.id !== found.id) return i;
+        let logrado = i.logrado;
+        if (p.add !== undefined) logrado = Math.max(0, i.logrado + minutes(p.add));
+        if (p.logrado !== undefined) logrado = minutes(p.logrado);
+        const objetivo = p.objetivo !== undefined ? minutes(p.objetivo) : i.objetivo;
+        return { ...i, logrado, objetivo };
+      });
+      await updateWeekBoard(board.id, { indicators: next });
+      const upd = next.find(i => i.id === found.id)!;
+      return `Listo. "${found.name}": ${upd.logrado}/${upd.objetivo}.`;
+    }
+
+    case 'add_day_task': {
+      const business = normBusiness(p.business);
+      const due = resolveDay(p.day);
+      const t = await createTask({
+        title: str(p.title, 'Tarea'),
+        notes: null,
+        area: areaFromBusiness(business, p.area),
+        priority: normPriority(p.priority),
+        status: 'hoy',
+        is_mit: false,
+        due_date: due,
+        position: 0,
+        project_id: null, goal_id: null,
+        business_key: business, column_key: null,
+      });
+      return `Listo. Creé la tarea "${t.title}" en el tablero del ${due}.`;
+    }
+
     default:
       return `Acción no reconocida: ${a.type}.`;
   }
+}
+
+// Resuelve un día: 'YYYY-MM-DD', o nombre (lunes..domingo) dentro de la semana actual. Default hoy.
+function resolveDay(v: unknown): string {
+  const raw = str(v).toLowerCase().trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const names = ['lunes', 'martes', 'miercoles', 'miércoles', 'jueves', 'viernes', 'sabado', 'sábado', 'domingo'];
+  const idxMap: Record<string, number> = { lunes: 0, martes: 1, miercoles: 2, 'miércoles': 2, jueves: 3, viernes: 4, sabado: 5, 'sábado': 5, domingo: 6 };
+  if (names.includes(raw)) {
+    const days = getWeekDays(getWeekStart());
+    return days[idxMap[raw]];
+  }
+  return TODAY();
 }
 
 function fmtMin(m: number): string {

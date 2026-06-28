@@ -367,6 +367,12 @@ export interface PmAiContext {
   visions: PmAiContextVision[];
   journal: PmAiContextJournal | null;
   memories: Array<{ category: string; title: string; content: string; importance: number }>;
+  weekBoard: {
+    week_start: string;
+    enfoque: string | null;
+    meta_principal: string | null;
+    indicators: Array<{ name: string; objetivo: number; logrado: number }>;
+  } | null;
 }
 
 export async function getPmAiContext(): Promise<PmAiContext> {
@@ -468,6 +474,19 @@ export async function getPmAiContext(): Promise<PmAiContext> {
     memories = mem.map(m => ({ category: m.category, title: m.title, content: m.content, importance: m.importance }));
   } catch { memories = []; }
 
+  // Kanban Semana: board de la semana actual
+  let weekBoard: PmAiContext['weekBoard'] = null;
+  try {
+    const wk = getWeekStart();
+    const b = await getOrCreateWeekBoard(wk);
+    weekBoard = {
+      week_start: wk,
+      enfoque: b.enfoque,
+      meta_principal: b.meta_principal,
+      indicators: (b.indicators ?? []).map(i => ({ name: i.name, objetivo: i.objetivo, logrado: i.logrado })),
+    };
+  } catch { weekBoard = null; }
+
   return {
     generatedAt: new Date().toISOString(),
     totalTasks: tasks.length,
@@ -484,6 +503,7 @@ export async function getPmAiContext(): Promise<PmAiContext> {
     visions,
     journal,
     memories,
+    weekBoard,
   };
 }
 
